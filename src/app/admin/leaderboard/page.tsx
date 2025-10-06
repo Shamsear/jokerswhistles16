@@ -287,25 +287,43 @@ export default function LeaderboardPage() {
         useCORS: true,
         allowTaint: true,
         onclone: (clonedDoc) => {
-          // Fix all color-related issues that might use oklab
-          // Remove backdrop-blur to avoid rendering issues
-          const backdropElements = clonedDoc.querySelectorAll('[class*="backdrop-blur"]')
+          // Comprehensive fix for oklab and other modern CSS issues
+          
+          // 1. Remove all backdrop filters
+          const backdropElements = clonedDoc.querySelectorAll('*')
           backdropElements.forEach((el: any) => {
-            el.style.backdropFilter = 'none'
+            const computed = window.getComputedStyle(el)
+            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
+              el.style.backdropFilter = 'none'
+            }
           })
           
-          // Replace gradient backgrounds with solid colors
-          const gradientElements = clonedDoc.querySelectorAll('[class*="bg-gradient"]')
-          gradientElements.forEach((el: any) => {
-            // Check if it's a text gradient
-            if (el.style.webkitBackgroundClip === 'text' || 
-                el.className.includes('bg-clip-text')) {
-              el.style.background = '#facc15'
-              el.style.backgroundClip = 'text'
-              el.style.webkitBackgroundClip = 'text'
-            } else {
-              // Regular gradient background
-              el.style.background = '#10b981' // emerald-500
+          // 2. Replace ALL gradient backgrounds (search entire cloned document)
+          const allElements = clonedDoc.querySelectorAll('*')
+          allElements.forEach((el: any) => {
+            const computed = window.getComputedStyle(el)
+            const bg = computed.background || computed.backgroundColor
+            
+            // Check if element has gradient or uses bg-clip-text
+            if (bg.includes('gradient') || el.className.includes('bg-gradient')) {
+              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
+                                   el.className.includes('bg-clip-text')
+              
+              if (isTextGradient) {
+                // Text gradient - use solid yellow
+                el.style.background = '#facc15'
+                el.style.webkitBackgroundClip = 'text'
+                el.style.backgroundClip = 'text'
+                el.style.color = 'transparent'
+              } else {
+                // Regular gradient - use solid emerald
+                el.style.background = '#10b981'
+              }
+            }
+            
+            // 3. Force replace any computed oklab/oklch colors
+            if (bg.includes('oklab') || bg.includes('oklch')) {
+              el.style.background = '#10b981'
             }
           })
         }

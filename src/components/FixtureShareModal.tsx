@@ -79,20 +79,30 @@ export default function FixtureShareModal({
         windowWidth: 1200,
         windowHeight: fixtureRef.current.scrollHeight,
         onclone: (clonedDoc) => {
-          // Fix gradient and backdrop issues to avoid oklab parsing errors
-          const backdropElements = clonedDoc.querySelectorAll('[class*="backdrop-blur"]')
-          backdropElements.forEach((el: any) => {
-            el.style.backdropFilter = 'none'
-          })
-          
-          const gradientElements = clonedDoc.querySelectorAll('[class*="bg-gradient"]')
-          gradientElements.forEach((el: any) => {
-            if (el.className.includes('bg-clip-text')) {
-              el.style.background = '#facc15'
-              el.style.backgroundClip = 'text'
-              el.style.webkitBackgroundClip = 'text'
-            } else {
-              el.style.background = '#10b981'
+          // Comprehensive fix for oklab and other modern CSS issues
+          const allElements = clonedDoc.querySelectorAll('*')
+          allElements.forEach((el: any) => {
+            const computed = window.getComputedStyle(el)
+            
+            // Remove backdrop filters
+            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
+              el.style.backdropFilter = 'none'
+            }
+            
+            // Replace gradients and oklab colors
+            const bg = computed.background || computed.backgroundColor
+            if (bg.includes('gradient') || bg.includes('oklab') || bg.includes('oklch')) {
+              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
+                                   el.className.includes('bg-clip-text')
+              
+              if (isTextGradient) {
+                el.style.background = '#facc15'
+                el.style.webkitBackgroundClip = 'text'
+                el.style.backgroundClip = 'text'
+                el.style.color = 'transparent'
+              } else {
+                el.style.background = '#10b981'
+              }
             }
           })
         }
@@ -135,20 +145,30 @@ export default function FixtureShareModal({
         windowWidth: 1200,
         windowHeight: fixtureRef.current.scrollHeight,
         onclone: (clonedDoc) => {
-          // Fix gradient and backdrop issues to avoid oklab parsing errors
-          const backdropElements = clonedDoc.querySelectorAll('[class*="backdrop-blur"]')
-          backdropElements.forEach((el: any) => {
-            el.style.backdropFilter = 'none'
-          })
-          
-          const gradientElements = clonedDoc.querySelectorAll('[class*="bg-gradient"]')
-          gradientElements.forEach((el: any) => {
-            if (el.className.includes('bg-clip-text')) {
-              el.style.background = '#facc15'
-              el.style.backgroundClip = 'text'
-              el.style.webkitBackgroundClip = 'text'
-            } else {
-              el.style.background = '#10b981'
+          // Comprehensive fix for oklab and other modern CSS issues
+          const allElements = clonedDoc.querySelectorAll('*')
+          allElements.forEach((el: any) => {
+            const computed = window.getComputedStyle(el)
+            
+            // Remove backdrop filters
+            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
+              el.style.backdropFilter = 'none'
+            }
+            
+            // Replace gradients and oklab colors
+            const bg = computed.background || computed.backgroundColor
+            if (bg.includes('gradient') || bg.includes('oklab') || bg.includes('oklch')) {
+              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
+                                   el.className.includes('bg-clip-text')
+              
+              if (isTextGradient) {
+                el.style.background = '#facc15'
+                el.style.webkitBackgroundClip = 'text'
+                el.style.backgroundClip = 'text'
+                el.style.color = 'transparent'
+              } else {
+                el.style.background = '#10b981'
+              }
             }
           })
         }
