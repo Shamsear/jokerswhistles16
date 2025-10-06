@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Loader2, Home, RefreshCw, Filter, Medal } from 'lucide-react'
+import { Trophy, Loader2, Home, RefreshCw, Medal } from 'lucide-react'
 
 interface Tournament {
   id: string
@@ -32,7 +32,7 @@ export default function PublicLeaderboardPage() {
   const [filteredLeaderboard, setFilteredLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedPool, setSelectedPool] = useState<string>('all')
+  const [selectedPool, setSelectedPool] = useState<string>('')
   const [autoRefresh, setAutoRefresh] = useState(true)
 
   // Fetch all data in parallel
@@ -110,14 +110,16 @@ export default function PublicLeaderboardPage() {
   }, [])
 
   const applyFilters = () => {
-    let filtered = [...leaderboard]
-
-    if (selectedPool !== 'all') {
-      filtered = filtered.filter(entry => entry.pool === selectedPool)
-    }
-
+    let filtered = leaderboard.filter(entry => entry.pool === selectedPool)
     setFilteredLeaderboard(filtered)
   }
+
+  // Auto-select first pool when pools are available
+  useEffect(() => {
+    if (uniquePools.length > 0 && !selectedPool) {
+      setSelectedPool(uniquePools[0] || '')
+    }
+  }, [uniquePools, selectedPool])
 
   const uniquePools = useMemo(() => 
     [...new Set(leaderboard.map(entry => entry.pool).filter(p => p !== null))].sort(),
@@ -276,32 +278,22 @@ export default function PublicLeaderboardPage() {
           </div>
         )}
 
-        {/* Pool Filter */}
+        {/* Pool Tabs */}
         {activeTournament && uniquePools.length > 0 && (
           <div className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
-            <div className="flex items-center space-x-2 mb-3">
-              <Filter className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
-              <h3 className="text-sm sm:text-base font-semibold text-white">Filter by Pool</h3>
+            <div className="flex items-center space-x-2 mb-4">
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+              <h3 className="text-sm sm:text-base font-semibold text-white">Select Pool</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedPool('all')}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-semibold transition-all text-sm sm:text-base touch-manipulation ${
-                  selectedPool === 'all'
-                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-lg shadow-yellow-500/50'
-                    : 'bg-black/40 text-slate-400 hover:bg-black/60 border border-slate-700/50'
-                }`}
-              >
-                All Pools
-              </button>
               {uniquePools.map(pool => (
                 <button
                   key={pool}
                   onClick={() => setSelectedPool(pool || '')}
-                  className={`px-3 sm:px-4 py-2 rounded-lg font-semibold transition-all text-sm sm:text-base touch-manipulation ${
+                  className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold text-sm sm:text-base transition-all touch-manipulation ${
                     selectedPool === pool
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/50'
-                      : 'bg-black/40 text-slate-400 hover:bg-black/60 border border-slate-700/50'
+                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-lg shadow-yellow-500/30'
+                      : 'bg-black/40 text-slate-300 hover:bg-black/60 border border-slate-600'
                   }`}
                 >
                   Pool {pool}

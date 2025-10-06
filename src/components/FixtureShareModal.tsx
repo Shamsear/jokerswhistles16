@@ -79,31 +79,37 @@ export default function FixtureShareModal({
         windowWidth: 1200,
         windowHeight: fixtureRef.current.scrollHeight,
         onclone: (clonedDoc) => {
-          // Comprehensive fix for oklab and other modern CSS issues
+          // Remove stylesheets and SVGs to prevent oklab/lab parsing
+          const stylesheets = clonedDoc.querySelectorAll('link[rel="stylesheet"], style')
+          stylesheets.forEach((sheet: any) => {
+            try { sheet.remove() } catch (e) {}
+          })
+          
+          const svgs = clonedDoc.querySelectorAll('svg')
+          svgs.forEach((svg: any) => {
+            try { svg.remove() } catch (e) {}
+          })
+          
           const allElements = clonedDoc.querySelectorAll('*')
           allElements.forEach((el: any) => {
-            const computed = window.getComputedStyle(el)
-            
-            // Remove backdrop filters
-            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
+            try {
               el.style.backdropFilter = 'none'
-            }
-            
-            // Replace gradients and oklab colors
-            const bg = computed.background || computed.backgroundColor
-            if (bg.includes('gradient') || bg.includes('oklab') || bg.includes('oklch')) {
-              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
-                                   el.className.includes('bg-clip-text')
+              el.style.webkitBackdropFilter = 'none'
+              el.style.filter = 'none'
               
-              if (isTextGradient) {
+              const className = el.className && typeof el.className === 'string' ? el.className : ''
+              
+              if (className.includes('bg-gradient') && (className.includes('bg-clip-text') || className.includes('text-transparent'))) {
                 el.style.background = '#facc15'
+                el.style.backgroundImage = 'none'
                 el.style.webkitBackgroundClip = 'text'
                 el.style.backgroundClip = 'text'
-                el.style.color = 'transparent'
-              } else {
+                el.style.webkitTextFillColor = 'transparent'
+              } else if (className.includes('bg-gradient')) {
                 el.style.background = '#10b981'
+                el.style.backgroundImage = 'none'
               }
-            }
+            } catch (e) {}
           })
         }
       })
@@ -145,31 +151,37 @@ export default function FixtureShareModal({
         windowWidth: 1200,
         windowHeight: fixtureRef.current.scrollHeight,
         onclone: (clonedDoc) => {
-          // Comprehensive fix for oklab and other modern CSS issues
+          // Remove stylesheets and SVGs to prevent oklab/lab parsing
+          const stylesheets = clonedDoc.querySelectorAll('link[rel="stylesheet"], style')
+          stylesheets.forEach((sheet: any) => {
+            try { sheet.remove() } catch (e) {}
+          })
+          
+          const svgs = clonedDoc.querySelectorAll('svg')
+          svgs.forEach((svg: any) => {
+            try { svg.remove() } catch (e) {}
+          })
+          
           const allElements = clonedDoc.querySelectorAll('*')
           allElements.forEach((el: any) => {
-            const computed = window.getComputedStyle(el)
-            
-            // Remove backdrop filters
-            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
+            try {
               el.style.backdropFilter = 'none'
-            }
-            
-            // Replace gradients and oklab colors
-            const bg = computed.background || computed.backgroundColor
-            if (bg.includes('gradient') || bg.includes('oklab') || bg.includes('oklch')) {
-              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
-                                   el.className.includes('bg-clip-text')
+              el.style.webkitBackdropFilter = 'none'
+              el.style.filter = 'none'
               
-              if (isTextGradient) {
+              const className = el.className && typeof el.className === 'string' ? el.className : ''
+              
+              if (className.includes('bg-gradient') && (className.includes('bg-clip-text') || className.includes('text-transparent'))) {
                 el.style.background = '#facc15'
+                el.style.backgroundImage = 'none'
                 el.style.webkitBackgroundClip = 'text'
                 el.style.backgroundClip = 'text'
-                el.style.color = 'transparent'
-              } else {
+                el.style.webkitTextFillColor = 'transparent'
+              } else if (className.includes('bg-gradient')) {
                 el.style.background = '#10b981'
+                el.style.backgroundImage = 'none'
               }
-            }
+            } catch (e) {}
           })
         }
       })

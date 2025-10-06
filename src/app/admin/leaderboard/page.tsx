@@ -70,7 +70,7 @@ export default function LeaderboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Filters
-  const [selectedPool, setSelectedPool] = useState<string>('all')
+  const [selectedPool, setSelectedPool] = useState<string>('')
   const [playerSearch, setPlayerSearch] = useState('')
   
   // Share modal
@@ -246,13 +246,9 @@ export default function LeaderboardPage() {
       })
   }, [matches])
 
-  // Filter leaderboard
+  // Filter leaderboard - always filter by selected pool
   const filteredLeaderboard = useMemo(() => {
-    let filtered = [...leaderboard]
-    
-    if (selectedPool !== 'all') {
-      filtered = filtered.filter(entry => entry.pool === selectedPool)
-    }
+    let filtered = leaderboard.filter(entry => entry.pool === selectedPool)
     
     if (playerSearch.trim()) {
       filtered = filtered.filter(entry =>
@@ -268,17 +264,25 @@ export default function LeaderboardPage() {
     return Array.from(pools).sort()
   }, [leaderboard])
 
+  // Auto-select first pool when pools are available
+  useEffect(() => {
+    if (uniquePools.length > 0 && !selectedPool) {
+      setSelectedPool(uniquePools[0] || '')
+    }
+  }, [uniquePools, selectedPool])
+
   // Share/Export functions
   const handleShare = async () => {
     setIsGeneratingImage(true)
     
     try {
-      const element = document.getElementById('leaderboard-table')
+      // Capture the shareable image container instead
+      const element = document.getElementById('shareable-leaderboard-image')
       if (!element) {
-        throw new Error('Table not found')
+        throw new Error('Shareable image container not found')
       }
 
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 800))
       
       const canvas = await html2canvas(element, {
         backgroundColor: '#0a0a0a',
@@ -286,44 +290,71 @@ export default function LeaderboardPage() {
         logging: false,
         useCORS: true,
         allowTaint: true,
-        onclone: (clonedDoc) => {
-          // Comprehensive fix for oklab and other modern CSS issues
-          
-          // 1. Remove all backdrop filters
-          const backdropElements = clonedDoc.querySelectorAll('*')
-          backdropElements.forEach((el: any) => {
-            const computed = window.getComputedStyle(el)
-            if (computed.backdropFilter && computed.backdropFilter !== 'none') {
-              el.style.backdropFilter = 'none'
+        foreignObjectRendering: false,
+        onclone: (clonedDoc, clonedElement) => {
+          // Remove all stylesheets to prevent oklab parsing
+          const stylesheets = clonedDoc.querySelectorAll('link[rel="stylesheet"], style')
+          stylesheets.forEach((sheet: any) => {
+            try {
+              sheet.remove()
+            } catch (e) {
+              // Ignore
             }
           })
           
-          // 2. Replace ALL gradient backgrounds (search entire cloned document)
+          // Remove all SVG elements that might have lab() colors
+          const svgs = clonedDoc.querySelectorAll('svg')
+          svgs.forEach((svg: any) => {
+            try {
+              svg.remove()
+            } catch (e) {
+              // Ignore
+            }
+          })
+          
+          // Apply inline styles directly to all elements
           const allElements = clonedDoc.querySelectorAll('*')
           allElements.forEach((el: any) => {
-            const computed = window.getComputedStyle(el)
-            const bg = computed.background || computed.backgroundColor
-            
-            // Check if element has gradient or uses bg-clip-text
-            if (bg.includes('gradient') || el.className.includes('bg-gradient')) {
-              const isTextGradient = computed.webkitBackgroundClip === 'text' || 
-                                   el.className.includes('bg-clip-text')
+            try {
+              const className = el.className && typeof el.className === 'string' ? el.className : ''
               
-              if (isTextGradient) {
-                // Text gradient - use solid yellow
+              // Remove backdrop filters
+              el.style.backdropFilter = 'none'
+              el.style.webkitBackdropFilter = 'none'
+              el.style.filter = 'none'
+              
+              // Handle gradient text
+              if (className.includes('bg-gradient') && (className.includes('bg-clip-text') || className.includes('text-transparent'))) {
                 el.style.background = '#facc15'
+                el.style.backgroundImage = 'none'
                 el.style.webkitBackgroundClip = 'text'
                 el.style.backgroundClip = 'text'
+                el.style.webkitTextFillColor = 'transparent'
                 el.style.color = 'transparent'
-              } else {
-                // Regular gradient - use solid emerald
-                el.style.background = '#10b981'
               }
-            }
-            
-            // 3. Force replace any computed oklab/oklch colors
-            if (bg.includes('oklab') || bg.includes('oklch')) {
-              el.style.background = '#10b981'
+              // Handle gradient backgrounds
+              else if (className.includes('bg-gradient')) {
+                el.style.background = '#10b981'
+                el.style.backgroundImage = 'none'
+              }
+              
+              // Handle specific color classes
+              if (className.includes('text-yellow-400')) el.style.color = '#facc15'
+              if (className.includes('text-emerald-400')) el.style.color = '#34d399'
+              if (className.includes('text-white')) el.style.color = '#ffffff'
+              if (className.includes('text-slate-300')) el.style.color = '#cbd5e1'
+              if (className.includes('text-slate-400')) el.style.color = '#94a3b8'
+              if (className.includes('text-red-400')) el.style.color = '#f87171'
+              if (className.includes('text-blue-400')) el.style.color = '#60a5fa'
+              
+              // Handle background colors
+              if (className.includes('bg-black')) el.style.background = '#000000'
+              if (className.includes('bg-emerald-500/5')) el.style.background = 'rgba(16, 185, 129, 0.05)'
+              if (className.includes('bg-yellow-500/10')) el.style.background = 'rgba(234, 179, 8, 0.1)'
+              if (className.includes('bg-blue-500/20')) el.style.background = 'rgba(59, 130, 246, 0.2)'
+              
+            } catch (e) {
+              // Skip elements that can't be styled
             }
           })
         }
@@ -530,50 +561,28 @@ export default function LeaderboardPage() {
           </div>
         )}
 
-        {/* Filters */}
-        {activeTournament && leaderboard.length > 0 && (
+        {/* Pool Tabs */}
+        {activeTournament && leaderboard.length > 0 && uniquePools.length > 0 && (
           <div className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
-            <div className="flex items-center space-x-2 mb-3 sm:mb-4">
-              <Search className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
-              <h3 className="text-base sm:text-lg font-semibold text-white">Search & Filter</h3>
+            <div className="flex items-center space-x-2 mb-4">
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+              <h3 className="text-base sm:text-lg font-semibold text-white">Select Pool</h3>
             </div>
             
-            <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-2">Pool</label>
-                <select
-                  value={selectedPool}
-                  onChange={(e) => setSelectedPool(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 bg-black/20 border-2 border-yellow-500/30 rounded-lg sm:rounded-xl text-white text-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-500/20 transition-all"
+            <div className="flex flex-wrap gap-2">
+              {uniquePools.map(pool => (
+                <button
+                  key={pool}
+                  onClick={() => setSelectedPool(pool || '')}
+                  className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold text-sm sm:text-base transition-all ${
+                    selectedPool === pool
+                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-lg shadow-yellow-500/30'
+                      : 'bg-black/40 text-slate-300 hover:bg-black/60 border border-slate-600'
+                  }`}
                 >
-                  <option value="all">All Pools</option>
-                  {uniquePools.map(pool => (
-                    <option key={pool} value={pool || ''}>{pool ? `Pool ${pool}` : 'No Pool'}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-emerald-400 mb-2">Player Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={playerSearch}
-                    onChange={(e) => setPlayerSearch(e.target.value)}
-                    placeholder="Search player..."
-                    className="w-full pl-10 pr-10 py-2 bg-black/20 border-2 border-emerald-500/30 rounded-lg sm:rounded-xl text-white text-sm placeholder-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                  />
-                  {playerSearch && (
-                    <button
-                      onClick={() => setPlayerSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700/50 rounded transition-all"
-                    >
-                      <XIcon className="h-3.5 w-3.5 text-slate-400" />
-                    </button>
-                  )}
-                </div>
-              </div>
+                  Pool {pool}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -746,6 +755,306 @@ export default function LeaderboardPage() {
           </div>
         </div>
       )}
+
+      {/* Hidden Shareable Image Container - Professional Layout */}
+      <div 
+        id="shareable-leaderboard-image" 
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          width: '1200px',
+          background: 'white',
+          padding: '40px',
+          fontFamily: 'Arial, sans-serif'
+        }}
+      >
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px', letterSpacing: '2px' }}>
+            SOUTH SOCCER'S PRESENTS
+          </div>
+          <h1 style={{ fontSize: '56px', fontWeight: '900', margin: '0', lineHeight: '1' }}>
+            <span style={{ color: '#facc15' }}>DUO</span>
+            <span style={{ color: '#000', marginLeft: '15px' }}>Tournament</span>
+          </h1>
+          <div style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+            {activeTournament?.name || 'Tournament Standings'}
+          </div>
+        </div>
+
+        {/* Tables by Pool */}
+        {uniquePools.length > 0 && selectedPool !== 'all' ? (
+          // Show only selected pool
+          (() => {
+            const poolEntries = filteredLeaderboard
+            return (
+              <div key={selectedPool} style={{ marginBottom: '40px' }}>
+                <h2 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: 'bold', 
+                  marginBottom: '15px',
+                  color: '#000',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px'
+                }}>
+                  GROUP {selectedPool}
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f5f5f5' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Rank</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Team</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>P</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>MP</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>W</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>D</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>L</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>F</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>A</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>GD</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>%</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>EP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poolEntries.map((entry, index) => (
+                      <tr key={entry.player.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #e5e5e5' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              background: index === 0 ? '#1e40af' : index === 1 ? '#1e40af' : index === 2 ? '#1e40af' : '#64748b',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {index + 1}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: '#e5e5e5',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: '#666'
+                            }}>
+                              {entry.player.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', textTransform: 'uppercase' }}>
+                              {entry.player.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>{entry.points}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.played}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.won}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.drawn}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.lost}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsFor}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsAgainst}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '600', color: entry.goalDifference > 0 ? '#16a34a' : entry.goalDifference < 0 ? '#dc2626' : '#666' }}>
+                          {entry.goalDifference > 0 ? '+' : ''}{entry.goalDifference}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()
+        ) : uniquePools.length > 0 ? (
+          // Show all pools when 'all' is selected
+          uniquePools.map(pool => {
+            const poolEntries = leaderboard.filter(e => e.pool === pool)
+            return (
+              <div key={pool} style={{ marginBottom: '40px' }}>
+                <h2 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: 'bold', 
+                  marginBottom: '15px',
+                  color: '#000',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px'
+                }}>
+                  GROUP {pool}
+                </h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f5f5f5' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Rank</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Team</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>P</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>MP</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>W</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>D</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>L</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>F</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>A</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>GD</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>%</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>EP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poolEntries.map((entry, index) => (
+                      <tr key={entry.player.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #e5e5e5' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '50%', 
+                              background: index === 0 ? '#1e40af' : index === 1 ? '#1e40af' : index === 2 ? '#1e40af' : '#64748b',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {index + 1}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: '#e5e5e5',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: '#666'
+                            }}>
+                              {entry.player.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', textTransform: 'uppercase' }}>
+                              {entry.player.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>{entry.points}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.played}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.won}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.drawn}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.lost}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsFor}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsAgainst}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '600', color: entry.goalDifference > 0 ? '#16a34a' : entry.goalDifference < 0 ? '#dc2626' : '#666' }}>
+                          {entry.goalDifference > 0 ? '+' : ''}{entry.goalDifference}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })
+        ) : (
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px', color: '#000' }}>
+              ALL PLAYERS
+            </h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Rank</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Team</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>P</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>MP</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>W</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>D</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>L</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>F</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>A</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>GD</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>%</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>EP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((entry, index) => (
+                  <tr key={entry.player.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #e5e5e5' }}>
+                    <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ 
+                          width: '28px', 
+                          height: '28px', 
+                          borderRadius: '50%', 
+                          background: index === 0 ? '#1e40af' : index === 1 ? '#1e40af' : index === 2 ? '#1e40af' : '#64748b',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          {index + 1}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: '#e5e5e5',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          color: '#666'
+                        }}>
+                          {entry.player.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', textTransform: 'uppercase' }}>
+                          {entry.player.name}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>{entry.points}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.played}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.won}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.drawn}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.lost}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsFor}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsAgainst}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '600', color: entry.goalDifference > 0 ? '#16a34a' : entry.goalDifference < 0 ? '#dc2626' : '#666' }}>
+                      {entry.goalDifference > 0 ? '+' : ''}{entry.goalDifference}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
