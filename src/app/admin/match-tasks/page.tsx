@@ -147,7 +147,7 @@ export default function MatchTasksAdmin() {
       const data = await response.json()
       
       if (response.ok && data.matches) {
-        const rounds = [...new Set(data.matches.map((m: Match) => m.round))].sort((a, b) => a - b)
+        const rounds: number[] = [...new Set(data.matches.map((m: Match) => m.round))].sort((a, b) => (a as number) - (b as number)) as number[]
         setAllRounds(rounds)
         // Auto-select first round
         if (rounds.length > 0) {

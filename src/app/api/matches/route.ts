@@ -99,8 +99,9 @@ export async function GET(request: NextRequest) {
               task: {
                 select: {
                   id: true,
-                  description: true,
-                  type: true
+                  name: true,
+                  homeDescription: true,
+                  awayDescription: true
                 }
               },
               player: {
