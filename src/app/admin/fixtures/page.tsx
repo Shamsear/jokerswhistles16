@@ -17,7 +17,8 @@ import {
   Share2,
   Search,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RotateCcw
 } from 'lucide-react'
 
 // Lazy load the share modal for better initial page load
@@ -73,13 +74,13 @@ export default function FixturesManagement() {
   const [editHomeScore, setEditHomeScore] = useState<string>('')
   const [editAwayScore, setEditAwayScore] = useState<string>('')
   const [savingMatchId, setSavingMatchId] = useState<string | null>(null)
+  const [resettingMatchId, setResettingMatchId] = useState<string | null>(null)
   
   // Share modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [shareRound, setShareRound] = useState<string>('all')
   
-  // Auto-refresh for real-time updates
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  // Removed auto-refresh - using optimistic updates for instant UI
   
   // Collapsible stats
   const [isStatsExpanded, setIsStatsExpanded] = useState(false)
@@ -107,16 +108,8 @@ export default function FixturesManagement() {
     }
   }, [isAuthenticated])
   
-  // Auto-refresh matches every 3 seconds for real-time updates (lightning fast!)
-  useEffect(() => {
-    if (!activeTournament || !autoRefresh || editingMatchId) return
-    
-    const interval = setInterval(() => {
-      fetchMatches(activeTournament.id, true) // true = background fetch
-    }, 3000) // Refresh every 3 seconds for near real-time updates
-    
-    return () => clearInterval(interval)
-  }, [activeTournament, autoRefresh, editingMatchId])
+  // No auto-refresh polling - using optimistic updates for instant feedback
+  // Manual refresh available via refresh button if needed
   
   // Debounce search inputs to reduce lag
   useEffect(() => {
@@ -249,8 +242,9 @@ export default function FixturesManagement() {
   const saveMatchResult = async (matchId: string) => {
     setSavingMatchId(matchId)
     
-    const homeScore = editHomeScore ? parseInt(editHomeScore) : null
-    const awayScore = editAwayScore ? parseInt(editAwayScore) : null
+    // Parse scores - handle 0 correctly (0 is valid, empty string is null)
+    const homeScore = editHomeScore !== '' ? parseInt(editHomeScore) : null
+    const awayScore = editAwayScore !== '' ? parseInt(editAwayScore) : null
     
     // OPTIMISTIC UPDATE: Update UI immediately before API call
     const optimisticMatches = matches.map(match => {
@@ -279,10 +273,14 @@ export default function FixturesManagement() {
       return match
     })
     
-    // Update UI instantly
+    // Update state immediately and synchronously
     setMatches(optimisticMatches)
     setSuccess('Match result saved!')
-    cancelEdit()
+    
+    // Clear edit mode synchronously
+    setEditingMatchId(null)
+    setEditHomeScore('')
+    setEditAwayScore('')
     
     // Add visual feedback - highlight updated match
     setRecentlyUpdatedMatches(prev => new Set(prev).add(matchId))
@@ -329,6 +327,80 @@ export default function FixturesManagement() {
       setTimeout(() => setError(''), 5000)
     } finally {
       setSavingMatchId(null)
+    }
+  }
+
+  const resetMatchResult = async (matchId: string) => {
+    if (!confirm('Are you sure you want to reset this match to pending? This will clear all scores and mark it as not completed.')) {
+      return
+    }
+
+    setResettingMatchId(matchId)
+    
+    // OPTIMISTIC UPDATE: Update UI immediately
+    const optimisticMatches = matches.map(match => {
+      if (match.id === matchId) {
+        return {
+          ...match,
+          homeScore: null,
+          awayScore: null,
+          status: 'pending',
+          winnerId: null
+        }
+      }
+      return match
+    })
+    
+    // Update UI instantly
+    setMatches(optimisticMatches)
+    setSuccess('Match reset to pending!')
+    
+    // Add visual feedback
+    setRecentlyUpdatedMatches(prev => new Set(prev).add(matchId))
+    setTimeout(() => {
+      setRecentlyUpdatedMatches(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(matchId)
+        return newSet
+      })
+    }, 2000)
+    
+    try {
+      // Make API call in background
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          homeScore: null,
+          awayScore: null,
+          status: 'pending'
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Success
+        setTimeout(() => setSuccess(''), 2000)
+      } else {
+        // Error - revert optimistic update
+        setError(data.error || 'Failed to reset match')
+        if (activeTournament) {
+          fetchMatches(activeTournament.id)
+        }
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      // Error - revert optimistic update
+      setError('Failed to reset match')
+      if (activeTournament) {
+        fetchMatches(activeTournament.id)
+      }
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setResettingMatchId(null)
     }
   }
 
@@ -490,17 +562,6 @@ export default function FixturesManagement() {
                     <Trophy className="h-3 w-3" />
                     <span>{stats.completed}/{stats.total}</span>
                   </button>
-                  <button
-                    onClick={() => setAutoRefresh(!autoRefresh)}
-                    className={`p-1.5 rounded-md ${
-                      autoRefresh ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-slate-500/20 border border-slate-500/30'
-                    }`}
-                    title={autoRefresh ? 'Live ON' : 'Live OFF'}
-                  >
-                    <div className={`w-2 h-2 rounded-full ${
-                      autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                    }`}></div>
-                  </button>
                 </div>
               )}
             </div>
@@ -523,23 +584,9 @@ export default function FixturesManagement() {
                   <span className="text-xs font-semibold">Stats</span>
                 </button>
                 <button
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold ${
-                    autoRefresh 
-                      ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400' 
-                      : 'bg-slate-500/20 border border-slate-500/30 text-slate-400'
-                  }`}
-                  title={autoRefresh ? 'Live updates ON (every 10s)' : 'Live updates OFF'}
-                >
-                  <div className={`w-2 h-2 rounded-full ${
-                    autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                  }`}></div>
-                  <span>Live</span>
-                </button>
-                <button
                   onClick={() => activeTournament && fetchMatches(activeTournament.id)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400"
-                  title="Refresh Now"
+                  title="Manually refresh data"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span className="text-xs font-semibold">Refresh</span>
@@ -748,9 +795,11 @@ export default function FixturesManagement() {
               <div className="space-y-3">
                 {filteredMatches.map((match) => {
                   const isRecentlyUpdated = recentlyUpdatedMatches.has(match.id)
+                  // Use compound key to force re-render on status change
+                  const matchKey = `${match.id}-${match.status}-${match.homeScore}-${match.awayScore}`
                   return (
                   <div
-                    key={match.id}
+                    key={matchKey}
                     className={`bg-black/40 border-2 rounded-xl p-4 transition-all ${
                       isRecentlyUpdated
                         ? 'border-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse'
@@ -890,12 +939,35 @@ export default function FixturesManagement() {
                           )}
                         </div>
 
-                        <button
-                          onClick={() => startEditMatch(match)}
-                          className="w-full md:w-auto md:ml-4 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 font-semibold text-sm md:text-base"
-                        >
-                          {match.status === 'completed' ? 'Edit' : 'Enter Result'}
-                        </button>
+                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto md:ml-4">
+                          <button
+                            onClick={() => startEditMatch(match)}
+                            className="flex-1 md:flex-none px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 font-semibold text-sm md:text-base"
+                          >
+                            {match.status === 'completed' ? 'Edit' : 'Enter Result'}
+                          </button>
+                          
+                          {match.status === 'completed' && (
+                            <button
+                              onClick={() => resetMatchResult(match.id)}
+                              disabled={resettingMatchId === match.id}
+                              className="flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 rounded-lg transition-all text-orange-400 font-semibold text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Reset match to pending"
+                            >
+                              {resettingMatchId === match.id ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin" />
+                                  <span className="text-xs md:text-sm">Resetting...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <RotateCcw className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                                  <span className="text-xs md:text-sm">Reset</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

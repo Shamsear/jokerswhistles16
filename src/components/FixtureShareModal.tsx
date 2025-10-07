@@ -34,7 +34,8 @@ export default function FixtureShareModal({
   selectedRound
 }: FixtureShareModalProps) {
   const [selectedPool, setSelectedPool] = useState<string>('all')
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
   const fixtureRef = useRef<HTMLDivElement>(null)
 
   const getFilteredMatches = () => {
@@ -65,7 +66,7 @@ export default function FixtureShareModal({
   const generateImage = async () => {
     if (!fixtureRef.current) return
 
-    setIsGenerating(true)
+    setIsDownloading(true)
     try {
       // Wait longer for rendering and font loading
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -126,18 +127,18 @@ export default function FixtureShareModal({
           document.body.removeChild(link)
           URL.revokeObjectURL(url)
         }
-        setIsGenerating(false)
+        setIsDownloading(false)
       }, 'image/png')
     } catch (error) {
       console.error('Error generating image:', error)
-      setIsGenerating(false)
+      setIsDownloading(false)
     }
   }
 
   const shareImage = async () => {
     if (!fixtureRef.current) return
 
-    setIsGenerating(true)
+    setIsSharing(true)
     try {
       // Wait longer for rendering and font loading
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -190,33 +191,65 @@ export default function FixtureShareModal({
         if (blob) {
           const file = new File([blob], 'fixtures.png', { type: 'image/png' })
           
-          if (navigator.share && navigator.canShare({ files: [file] })) {
+          // Check if Web Share API is available
+          if (navigator.share) {
             try {
-              await navigator.share({
-                files: [file],
-                title: 'Tournament Fixtures',
-                text: `${tournamentName} - Fixtures`
-              })
-            } catch (err) {
-              console.log('Share cancelled or failed')
+              // Try sharing with file if supported
+              if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                  files: [file],
+                  title: 'Tournament Fixtures',
+                  text: `${tournamentName} - Round ${selectedRound} Fixtures`
+                })
+              } else {
+                // Share without file (URL or text only)
+                await navigator.share({
+                  title: 'Tournament Fixtures',
+                  text: `${tournamentName} - Round ${selectedRound} Fixtures - Check out the match schedule!`
+                })
+                
+                // Also download the image since we couldn't share it
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `fixtures-round-${selectedRound}.png`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                URL.revokeObjectURL(url)
+              }
+            } catch (err: any) {
+              // User cancelled or error occurred
+              if (err.name !== 'AbortError') {
+                console.error('Share failed:', err)
+                // Fallback to download
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `fixtures-round-${selectedRound}.png`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                URL.revokeObjectURL(url)
+              }
             }
           } else {
-            // Fallback to download if sharing not supported
+            // Fallback to download if sharing not supported (desktop)
             const url = URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            link.download = 'fixtures.png'
+            link.download = `fixtures-round-${selectedRound}.png`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
           }
         }
-        setIsGenerating(false)
+        setIsSharing(false)
       }, 'image/png')
     } catch (error) {
       console.error('Error sharing image:', error)
-      setIsGenerating(false)
+      setIsSharing(false)
     }
   }
 
@@ -368,13 +401,13 @@ export default function FixtureShareModal({
         <div className="p-4 sm:p-6 border-t border-slate-700/50 flex flex-col sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={generateImage}
-            disabled={isGenerating}
+            disabled={isDownloading || isSharing}
             className="flex-1 flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
-            {isGenerating ? (
+            {isDownloading ? (
               <>
                 <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                <span>Generating...</span>
+                <span>Downloading...</span>
               </>
             ) : (
               <>
@@ -386,13 +419,13 @@ export default function FixtureShareModal({
 
           <button
             onClick={shareImage}
-            disabled={isGenerating}
+            disabled={isDownloading || isSharing}
             className="flex-1 flex items-center justify-center space-x-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
-            {isGenerating ? (
+            {isSharing ? (
               <>
                 <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                <span>Generating...</span>
+                <span>Sharing...</span>
               </>
             ) : (
               <>
