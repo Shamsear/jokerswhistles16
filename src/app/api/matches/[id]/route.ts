@@ -116,22 +116,38 @@ export async function PATCH(
       updateData.status = status
     }
 
+    // Optimized: Only include necessary data, skip taskAssignments for speed
     const match = await prisma.match.update({
       where: { id },
       data: updateData,
-      include: {
-        homePlayer: true,
-        awayPlayer: true,
-        taskAssignments: {
-          include: {
-            task: true,
-            player: true
+      select: {
+        id: true,
+        homeScore: true,
+        awayScore: true,
+        status: true,
+        winnerId: true,
+        round: true,
+        pool: true,
+        homePlayer: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        awayPlayer: {
+          select: {
+            id: true,
+            name: true
           }
         }
       }
     })
 
-    return NextResponse.json({ match })
+    return NextResponse.json({ match }, {
+      headers: {
+        'Cache-Control': 'no-store, must-revalidate'
+      }
+    })
   } catch (error) {
     console.error('Error updating match:', error)
     return NextResponse.json(

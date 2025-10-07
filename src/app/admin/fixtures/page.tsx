@@ -86,6 +86,9 @@ export default function FixturesManagement() {
   
   // Collapsible filters
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false)
+  
+  // Track recently updated matches for visual feedback
+  const [recentlyUpdatedMatches, setRecentlyUpdatedMatches] = useState<Set<string>>(new Set())
 
   // Check authentication
   useEffect(() => {
@@ -104,13 +107,13 @@ export default function FixturesManagement() {
     }
   }, [isAuthenticated])
   
-  // Auto-refresh matches every 10 seconds for real-time updates
+  // Auto-refresh matches every 3 seconds for real-time updates (lightning fast!)
   useEffect(() => {
     if (!activeTournament || !autoRefresh || editingMatchId) return
     
     const interval = setInterval(() => {
       fetchMatches(activeTournament.id, true) // true = background fetch
-    }, 10000) // Refresh every 10 seconds
+    }, 3000) // Refresh every 3 seconds for near real-time updates
     
     return () => clearInterval(interval)
   }, [activeTournament, autoRefresh, editingMatchId])
@@ -245,33 +248,84 @@ export default function FixturesManagement() {
 
   const saveMatchResult = async (matchId: string) => {
     setSavingMatchId(matchId)
+    
+    const homeScore = editHomeScore ? parseInt(editHomeScore) : null
+    const awayScore = editAwayScore ? parseInt(editAwayScore) : null
+    
+    // OPTIMISTIC UPDATE: Update UI immediately before API call
+    const optimisticMatches = matches.map(match => {
+      if (match.id === matchId) {
+        let status = match.status
+        let winnerId = match.winnerId
+        
+        // Calculate status and winner
+        if (homeScore !== null && awayScore !== null) {
+          status = 'completed'
+          winnerId = homeScore > awayScore ? match.homePlayer.id : 
+                    awayScore > homeScore ? match.awayPlayer.id : null
+        } else {
+          status = 'pending'
+          winnerId = null
+        }
+        
+        return {
+          ...match,
+          homeScore,
+          awayScore,
+          status,
+          winnerId
+        }
+      }
+      return match
+    })
+    
+    // Update UI instantly
+    setMatches(optimisticMatches)
+    setSuccess('Match result saved!')
+    cancelEdit()
+    
+    // Add visual feedback - highlight updated match
+    setRecentlyUpdatedMatches(prev => new Set(prev).add(matchId))
+    setTimeout(() => {
+      setRecentlyUpdatedMatches(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(matchId)
+        return newSet
+      })
+    }, 2000) // Remove highlight after 2 seconds
+    
     try {
+      // Make API call in background
       const response = await fetch(`/api/matches/${matchId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          homeScore: editHomeScore ? parseInt(editHomeScore) : null,
-          awayScore: editAwayScore ? parseInt(editAwayScore) : null
+          homeScore,
+          awayScore
         })
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        setSuccess('Match result saved successfully!')
-        cancelEdit()
-        if (activeTournament) {
-          fetchMatches(activeTournament.id)
-        }
-        setTimeout(() => setSuccess(''), 3000)
+        // Success - optimistic update was correct
+        setTimeout(() => setSuccess(''), 2000)
       } else {
+        // Error - revert optimistic update
         setError(data.error || 'Failed to save match result')
+        if (activeTournament) {
+          fetchMatches(activeTournament.id) // Revert to server state
+        }
         setTimeout(() => setError(''), 5000)
       }
     } catch (err) {
+      // Error - revert optimistic update
       setError('Failed to save match result')
+      if (activeTournament) {
+        fetchMatches(activeTournament.id) // Revert to server state
+      }
       setTimeout(() => setError(''), 5000)
     } finally {
       setSavingMatchId(null)
@@ -692,11 +746,15 @@ export default function FixturesManagement() {
             
             {filteredMatches.length > 0 ? (
               <div className="space-y-3">
-                {filteredMatches.map((match) => (
+                {filteredMatches.map((match) => {
+                  const isRecentlyUpdated = recentlyUpdatedMatches.has(match.id)
+                  return (
                   <div
                     key={match.id}
                     className={`bg-black/40 border-2 rounded-xl p-4 transition-all ${
-                      match.status === 'completed' 
+                      isRecentlyUpdated
+                        ? 'border-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse'
+                        : match.status === 'completed' 
                         ? 'border-emerald-500/30 hover:border-emerald-500/50' 
                         : 'border-purple-500/30 hover:border-purple-500/50'
                     }`}
@@ -841,7 +899,8 @@ export default function FixturesManagement() {
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
