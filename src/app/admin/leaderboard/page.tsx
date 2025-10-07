@@ -281,12 +281,14 @@ export default function LeaderboardPage() {
     await new Promise(resolve => setTimeout(resolve, 800))
     
     return await html2canvas(element, {
-        backgroundColor: '#0a0a0a',
-        scale: 2,
+        backgroundColor: '#ffffff',
+        scale: 3,
         logging: false,
         useCORS: true,
         allowTaint: true,
         foreignObjectRendering: false,
+        imageTimeout: 0,
+        removeContainer: true,
         onclone: (clonedDoc, clonedElement) => {
           // Remove all stylesheets to prevent oklab parsing
           const stylesheets = clonedDoc.querySelectorAll('link[rel="stylesheet"], style')
@@ -355,7 +357,6 @@ export default function LeaderboardPage() {
           })
         }
       })
-    })
   }
 
   const handleShare = async () => {
@@ -807,22 +808,23 @@ export default function LeaderboardPage() {
           position: 'fixed',
           left: '-9999px',
           top: 0,
-          width: '1200px',
-          background: 'white',
-          padding: '40px',
-          fontFamily: 'Arial, sans-serif'
+          width: '1400px',
+          background: '#ffffff',
+          padding: '50px',
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          boxSizing: 'border-box'
         }}
       >
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px', letterSpacing: '2px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px', borderBottom: '3px solid #facc15', paddingBottom: '30px' }}>
+          <div style={{ fontSize: '18px', color: '#888', marginBottom: '12px', letterSpacing: '3px', fontWeight: '600' }}>
             SOUTH SOCCER'S PRESENTS
           </div>
-          <h1 style={{ fontSize: '56px', fontWeight: '900', margin: '0', lineHeight: '1' }}>
-            <span style={{ color: '#facc15' }}>DUO</span>
-            <span style={{ color: '#000', marginLeft: '15px' }}>Tournament</span>
+          <h1 style={{ fontSize: '64px', fontWeight: '900', margin: '0', lineHeight: '1.1' }}>
+            <span style={{ color: '#facc15' }}>Joker's</span>
+            <span style={{ color: '#000', marginLeft: '20px' }}>Whistle</span>
           </h1>
-          <div style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+          <div style={{ fontSize: '16px', color: '#666', marginTop: '15px', fontWeight: '500' }}>
             {activeTournament?.name || 'Tournament Standings'}
           </div>
         </div>
@@ -835,88 +837,94 @@ export default function LeaderboardPage() {
             return (
               <div key={selectedPool} style={{ marginBottom: '40px' }}>
                 <h2 style={{ 
-                  fontSize: '18px', 
-                  fontWeight: 'bold', 
-                  marginBottom: '15px',
+                  fontSize: '24px', 
+                  fontWeight: '800', 
+                  marginBottom: '20px',
                   color: '#000',
                   textTransform: 'uppercase',
-                  letterSpacing: '1px'
+                  letterSpacing: '2px',
+                  padding: '12px 20px',
+                  background: 'linear-gradient(90deg, #facc15 0%, #f59e0b 100%)',
+                  borderRadius: '8px'
                 }}>
                   GROUP {selectedPool}
                 </h2>
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', marginBottom: '30px', border: '2px solid #e5e5e5', borderRadius: '12px', overflow: 'hidden' }}>
                   <thead>
-                    <tr style={{ backgroundColor: '#f5f5f5' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Rank</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>Team</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>P</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>MP</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>W</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>D</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>L</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>F</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>A</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>GD</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>%</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>EP</th>
+                    <tr style={{ backgroundColor: '#1e293b' }}>
+                      <th style={{ padding: '14px 18px', textAlign: 'left', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>Rank</th>
+                      <th style={{ padding: '14px 18px', textAlign: 'left', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>Team</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>P</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>MP</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>W</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>D</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>L</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>F</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>A</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>GD</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>%</th>
+                      <th style={{ padding: '14px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: '#ffffff', textTransform: 'uppercase', borderBottom: '2px solid #334155' }}>EP</th>
                     </tr>
                   </thead>
                   <tbody>
                     {poolEntries.map((entry, index) => (
-                      <tr key={entry.player.id} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #e5e5e5' }}>
-                        <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <tr key={entry.player.id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0', transition: 'background-color 0.2s' }}>
+                        <td style={{ padding: '16px 18px', fontSize: '15px', fontWeight: '600', color: '#0f172a' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ 
-                              width: '28px', 
-                              height: '28px', 
+                              width: '32px', 
+                              height: '32px', 
                               borderRadius: '50%', 
-                              background: index === 0 ? '#1e40af' : index === 1 ? '#1e40af' : index === 2 ? '#1e40af' : '#64748b',
+                              background: index === 0 ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)' : index === 1 ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)' : index === 2 ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)' : 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)',
                               color: 'white',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '12px',
+                              fontSize: '14px',
                               fontWeight: 'bold',
-                              lineHeight: '1'
+                              lineHeight: '32px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                             }}>
                               {index + 1}
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <td style={{ padding: '16px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             <div style={{
-                              width: '32px',
-                              height: '32px',
+                              width: '38px',
+                              height: '38px',
                               borderRadius: '50%',
-                              background: '#e5e5e5',
+                              background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                              border: '2px solid #d1d5db',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              color: '#666',
-                              lineHeight: '1'
+                              fontSize: '13px',
+                              fontWeight: '800',
+                              color: '#374151',
+                              lineHeight: '38px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a1a', textTransform: 'uppercase' }}>
+                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                               {entry.player.name}
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1a1a1a' }}>{entry.points}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.played}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.won}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.drawn}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.lost}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsFor}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>{entry.goalsAgainst}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '600', color: entry.goalDifference > 0 ? '#16a34a' : entry.goalDifference < 0 ? '#dc2626' : '#666' }}>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '16px', fontWeight: '800', color: '#0f172a', background: '#fef3c7' }}>{entry.points}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#475569' }}>{entry.played}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#16a34a' }}>{entry.won}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#f59e0b' }}>{entry.drawn}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#dc2626' }}>{entry.lost}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#475569' }}>{entry.goalsFor}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#475569' }}>{entry.goalsAgainst}</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '700', color: entry.goalDifference > 0 ? '#16a34a' : entry.goalDifference < 0 ? '#dc2626' : '#64748b', background: entry.goalDifference > 0 ? '#f0fdf4' : entry.goalDifference < 0 ? '#fef2f2' : 'transparent' }}>
                           {entry.goalDifference > 0 ? '+' : ''}{entry.goalDifference}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '14px', color: '#666' }}>0</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#64748b' }}>0</td>
+                        <td style={{ padding: '16px 12px', textAlign: 'center', fontSize: '15px', fontWeight: '600', color: '#64748b' }}>0</td>
                       </tr>
                     ))}
                   </tbody>
@@ -973,7 +981,7 @@ export default function LeaderboardPage() {
                               justifyContent: 'center',
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              lineHeight: '1'
+                              lineHeight: '28px'
                             }}>
                               {index + 1}
                             </div>
@@ -992,7 +1000,7 @@ export default function LeaderboardPage() {
                               fontSize: '12px',
                               fontWeight: '700',
                               color: '#666',
-                              lineHeight: '1'
+                              lineHeight: '32px'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
@@ -1058,7 +1066,7 @@ export default function LeaderboardPage() {
                           justifyContent: 'center',
                           fontSize: '12px',
                           fontWeight: 'bold',
-                          lineHeight: '1'
+                          lineHeight: '28px'
                         }}>
                           {index + 1}
                         </div>
@@ -1077,7 +1085,7 @@ export default function LeaderboardPage() {
                           fontSize: '12px',
                           fontWeight: '700',
                           color: '#666',
-                          lineHeight: '1'
+                          lineHeight: '32px'
                         }}>
                           {entry.player.name.substring(0, 2).toUpperCase()}
                         </div>
