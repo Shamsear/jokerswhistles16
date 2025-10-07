@@ -21,7 +21,7 @@ export default function AdminLogin() {
     try {
       // Simple credential check (in production, use proper authentication)
       if (email === process.env.NEXT_PUBLIC_ADMIN_EMAIL || email === 'admin@tournament.com') {
-        if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'admin123') {
+        if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'ssleagues16admin') {
           // Store admin session
           sessionStorage.setItem('adminAuth', 'true')
           router.push('/admin')
@@ -154,15 +154,6 @@ export default function AdminLogin() {
               )}
             </button>
           </form>
-
-          {/* Default Credentials Info */}
-          <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
-            <p className="text-xs text-emerald-300 text-center leading-relaxed">
-              <span className="font-bold text-emerald-400 block mb-2">🔑 DEFAULT CREDENTIALS</span>
-              <span className="text-slate-400">Email:</span> <span className="text-white font-mono">admin@tournament.com</span><br />
-              <span className="text-slate-400">Password:</span> <span className="text-white font-mono">admin123</span>
-            </p>
-          </div>
         </div>
 
         {/* Back to Home */}
