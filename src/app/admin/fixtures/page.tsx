@@ -75,6 +75,7 @@ export default function FixturesManagement() {
   const [editAwayScore, setEditAwayScore] = useState<string>('')
   const [savingMatchId, setSavingMatchId] = useState<string | null>(null)
   const [resettingMatchId, setResettingMatchId] = useState<string | null>(null)
+  const [isSavingToServer, setIsSavingToServer] = useState(false)
   
   // Share modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
@@ -110,6 +111,20 @@ export default function FixturesManagement() {
   
   // No auto-refresh polling - using optimistic updates for instant feedback
   // Manual refresh available via refresh button if needed
+  
+  // Prevent page refresh/navigation during save
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSavingToServer) {
+        e.preventDefault()
+        e.returnValue = ''
+        return ''
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isSavingToServer])
   
   // Debounce search inputs to reduce lag
   useEffect(() => {
@@ -241,10 +256,12 @@ export default function FixturesManagement() {
 
   const saveMatchResult = async (matchId: string) => {
     setSavingMatchId(matchId)
+    setIsSavingToServer(true) // Prevent page refresh during save
     
-    // Parse scores - handle 0 correctly (0 is valid, empty string is null)
-    const homeScore = editHomeScore !== '' ? parseInt(editHomeScore) : null
-    const awayScore = editAwayScore !== '' ? parseInt(editAwayScore) : null
+    // Treat empty fields as 0 when saving (user left field blank = 0 score)
+    // Only null if BOTH fields are empty (no result entered)
+    const homeScore = editHomeScore !== '' ? parseInt(editHomeScore) : (editAwayScore !== '' ? 0 : null)
+    const awayScore = editAwayScore !== '' ? parseInt(editAwayScore) : (editHomeScore !== '' ? 0 : null)
     
     // OPTIMISTIC UPDATE: Update UI immediately before API call
     const optimisticMatches = matches.map(match => {
@@ -309,6 +326,7 @@ export default function FixturesManagement() {
 
       if (response.ok) {
         // Success - optimistic update was correct
+        setIsSavingToServer(false) // Allow refresh now
         setTimeout(() => setSuccess(''), 2000)
       } else {
         // Error - revert optimistic update
@@ -316,6 +334,7 @@ export default function FixturesManagement() {
         if (activeTournament) {
           fetchMatches(activeTournament.id) // Revert to server state
         }
+        setIsSavingToServer(false)
         setTimeout(() => setError(''), 5000)
       }
     } catch (err) {
@@ -324,6 +343,7 @@ export default function FixturesManagement() {
       if (activeTournament) {
         fetchMatches(activeTournament.id) // Revert to server state
       }
+      setIsSavingToServer(false)
       setTimeout(() => setError(''), 5000)
     } finally {
       setSavingMatchId(null)
@@ -336,6 +356,7 @@ export default function FixturesManagement() {
     }
 
     setResettingMatchId(matchId)
+    setIsSavingToServer(true) // Prevent page refresh during reset
     
     // OPTIMISTIC UPDATE: Update UI immediately
     const optimisticMatches = matches.map(match => {
@@ -383,6 +404,7 @@ export default function FixturesManagement() {
 
       if (response.ok) {
         // Success
+        setIsSavingToServer(false) // Allow refresh now
         setTimeout(() => setSuccess(''), 2000)
       } else {
         // Error - revert optimistic update
@@ -390,6 +412,7 @@ export default function FixturesManagement() {
         if (activeTournament) {
           fetchMatches(activeTournament.id)
         }
+        setIsSavingToServer(false)
         setTimeout(() => setError(''), 5000)
       }
     } catch (err) {
@@ -398,6 +421,7 @@ export default function FixturesManagement() {
       if (activeTournament) {
         fetchMatches(activeTournament.id)
       }
+      setIsSavingToServer(false)
       setTimeout(() => setError(''), 5000)
     } finally {
       setResettingMatchId(null)

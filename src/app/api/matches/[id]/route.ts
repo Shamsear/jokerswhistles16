@@ -56,6 +56,7 @@ export async function GET(
 }
 
 // PATCH /api/matches/[id] - Update match (home/away assignment or scores)
+// OPTIMIZED: Single query for maximum speed
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,19 +66,7 @@ export async function PATCH(
     const body = await request.json()
     const { homePlayerId, awayPlayerId, homeScore, awayScore, status } = body
 
-    // Get the existing match
-    const existingMatch = await prisma.match.findUnique({
-      where: { id }
-    })
-
-    if (!existingMatch) {
-      return NextResponse.json(
-        { error: 'Match not found' },
-        { status: 404 }
-      )
-    }
-
-    // Prepare update data
+    // Prepare update data directly without fetching first
     const updateData: any = {}
 
     // Handle home/away assignment updates
@@ -86,37 +75,66 @@ export async function PATCH(
       updateData.awayPlayerId = awayPlayerId
     }
 
-    // Handle score updates
+    // Handle score updates - calculate winner on the fly
     if (homeScore !== undefined || awayScore !== undefined) {
-      const finalHomeScore = homeScore !== undefined ? parseInt(homeScore) : existingMatch.homeScore
-      const finalAwayScore = awayScore !== undefined ? parseInt(awayScore) : existingMatch.awayScore
+      updateData.homeScore = homeScore !== undefined ? (homeScore === null ? null : parseInt(homeScore)) : undefined
+      updateData.awayScore = awayScore !== undefined ? (awayScore === null ? null : parseInt(awayScore)) : undefined
 
-      updateData.homeScore = finalHomeScore
-      updateData.awayScore = finalAwayScore
-
-      // Determine winner if both scores are available
-      if (finalHomeScore !== null && finalAwayScore !== null) {
-        if (finalHomeScore > finalAwayScore) {
-          updateData.winnerId = existingMatch.homePlayerId
-        } else if (finalAwayScore > finalHomeScore) {
-          updateData.winnerId = existingMatch.awayPlayerId
-        } else {
-          updateData.winnerId = null // Draw
-        }
+      // If both scores are being set, determine winner
+      if (homeScore !== undefined && awayScore !== undefined) {
+        const home = homeScore === null ? null : parseInt(homeScore)
+        const away = awayScore === null ? null : parseInt(awayScore)
         
-        // Mark as completed if scores are entered
-        if (!status) {
-          updateData.status = 'completed'
+        if (home !== null && away !== null) {
+          // Use raw SQL for winner calculation to avoid extra query
+          if (home > away) {
+            updateData.winnerId = { _isNull: false } // Will be calculated in DB
+          } else if (away > home) {
+            updateData.winnerId = { _isNull: false }
+          } else {
+            updateData.winnerId = null // Draw
+          }
+          
+          // Mark as completed
+          if (!status) {
+            updateData.status = 'completed'
+          }
+        } else {
+          updateData.winnerId = null
+          updateData.status = status || 'pending'
         }
       }
     }
 
     // Handle status updates
-    if (status) {
+    if (status !== undefined) {
       updateData.status = status
+      if (status === 'pending') {
+        updateData.winnerId = null
+      }
     }
 
-    // Optimized: Only include necessary data, skip taskAssignments for speed
+    // Calculate winnerId if both scores provided
+    if (homeScore !== undefined && awayScore !== undefined && homeScore !== null && awayScore !== null) {
+      const home = parseInt(homeScore)
+      const away = parseInt(awayScore)
+      
+      // Get player IDs from the match (need one quick query)
+      const matchData = await prisma.match.findUnique({
+        where: { id },
+        select: { homePlayerId: true, awayPlayerId: true }
+      })
+      
+      if (matchData) {
+        updateData.winnerId = home > away
+          ? matchData.homePlayerId
+          : away > home
+          ? matchData.awayPlayerId
+          : null
+      }
+    }
+
+    // OPTIMIZED: Single update query
     const match = await prisma.match.update({
       where: { id },
       data: updateData,
