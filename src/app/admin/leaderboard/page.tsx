@@ -272,19 +272,15 @@ export default function LeaderboardPage() {
   }, [uniquePools, selectedPool])
 
   // Share/Export functions
-  const handleShare = async () => {
-    setIsGeneratingImage(true)
-    
-    try {
-      // Capture the shareable image container instead
-      const element = document.getElementById('shareable-leaderboard-image')
-      if (!element) {
-        throw new Error('Shareable image container not found')
-      }
+  const generateCanvas = async () => {
+    const element = document.getElementById('shareable-leaderboard-image')
+    if (!element) {
+      throw new Error('Shareable image container not found')
+    }
 
-      await new Promise(resolve => setTimeout(resolve, 800))
-      
-      const canvas = await html2canvas(element, {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    return await html2canvas(element, {
         backgroundColor: '#0a0a0a',
         scale: 2,
         logging: false,
@@ -359,6 +355,14 @@ export default function LeaderboardPage() {
           })
         }
       })
+    })
+  }
+
+  const handleShare = async () => {
+    setIsGeneratingImage(true)
+    
+    try {
+      const canvas = await generateCanvas()
       
       canvas.toBlob((blob) => {
         if (blob) {
@@ -369,16 +373,37 @@ export default function LeaderboardPage() {
               title: `${activeTournament?.name} - Leaderboard`,
               text: 'Tournament Leaderboard',
               files: [file]
+            }).then(() => {
+              setSuccess('Leaderboard shared successfully!')
+              setTimeout(() => setSuccess(''), 3000)
             }).catch(() => {
-              downloadImage(canvas)
+              setError('Share cancelled or failed')
+              setTimeout(() => setError(''), 3000)
             })
           } else {
-            downloadImage(canvas)
+            setError('Sharing not supported on this device')
+            setTimeout(() => setError(''), 3000)
           }
         }
         setIsGeneratingImage(false)
         setIsShareModalOpen(false)
       }, 'image/png')
+    } catch (err) {
+      console.error('Failed to generate image:', err)
+      setError('Failed to generate image')
+      setIsGeneratingImage(false)
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleDownload = async () => {
+    setIsGeneratingImage(true)
+    
+    try {
+      const canvas = await generateCanvas()
+      downloadImage(canvas)
+      setIsGeneratingImage(false)
+      setIsShareModalOpen(false)
     } catch (err) {
       console.error('Failed to generate image:', err)
       setError('Failed to generate image')
@@ -721,16 +746,16 @@ export default function LeaderboardPage() {
       {isShareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-black/90 border-2 border-yellow-500/30 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-white mb-4">Share Leaderboard</h3>
+            <h3 className="text-xl font-bold text-white mb-4">Export Leaderboard</h3>
             <p className="text-slate-400 text-sm mb-6">
-              Generate and share the current leaderboard standings as an image.
+              Share directly or download the leaderboard as an image.
             </p>
             
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3">
               <button
                 onClick={handleShare}
                 disabled={isGeneratingImage}
-                className="flex-1 flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGeneratingImage ? (
                   <>
@@ -740,10 +765,29 @@ export default function LeaderboardPage() {
                 ) : (
                   <>
                     <Share2 className="h-5 w-5" />
-                    <span>Share/Download</span>
+                    <span>Share</span>
                   </>
                 )}
               </button>
+              
+              <button
+                onClick={handleDownload}
+                disabled={isGeneratingImage}
+                className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingImage ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-5 w-5" />
+                    <span>Download</span>
+                  </>
+                )}
+              </button>
+              
               <button
                 onClick={() => setIsShareModalOpen(false)}
                 disabled={isGeneratingImage}
@@ -833,8 +877,7 @@ export default function LeaderboardPage() {
                               justifyContent: 'center',
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              lineHeight: '28px',
-                              textAlign: 'center'
+                              lineHeight: '1'
                             }}>
                               {index + 1}
                             </div>
@@ -853,8 +896,7 @@ export default function LeaderboardPage() {
                               fontSize: '12px',
                               fontWeight: '700',
                               color: '#666',
-                              lineHeight: '32px',
-                              textAlign: 'center'
+                              lineHeight: '1'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
@@ -931,8 +973,7 @@ export default function LeaderboardPage() {
                               justifyContent: 'center',
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              lineHeight: '28px',
-                              textAlign: 'center'
+                              lineHeight: '1'
                             }}>
                               {index + 1}
                             </div>
@@ -951,8 +992,7 @@ export default function LeaderboardPage() {
                               fontSize: '12px',
                               fontWeight: '700',
                               color: '#666',
-                              lineHeight: '32px',
-                              textAlign: 'center'
+                              lineHeight: '1'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
@@ -1018,8 +1058,7 @@ export default function LeaderboardPage() {
                           justifyContent: 'center',
                           fontSize: '12px',
                           fontWeight: 'bold',
-                          lineHeight: '28px',
-                          textAlign: 'center'
+                          lineHeight: '1'
                         }}>
                           {index + 1}
                         </div>
@@ -1038,8 +1077,7 @@ export default function LeaderboardPage() {
                           fontSize: '12px',
                           fontWeight: '700',
                           color: '#666',
-                          lineHeight: '32px',
-                          textAlign: 'center'
+                          lineHeight: '1'
                         }}>
                           {entry.player.name.substring(0, 2).toUpperCase()}
                         </div>
