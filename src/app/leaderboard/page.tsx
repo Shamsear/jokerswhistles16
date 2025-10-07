@@ -109,6 +109,11 @@ export default function PublicLeaderboardPage() {
     }
   }, [])
 
+  const uniquePools = useMemo(() => 
+    [...new Set(leaderboard.map(entry => entry.pool).filter(p => p !== null))].sort(),
+    [leaderboard]
+  )
+
   const applyFilters = () => {
     let filtered = leaderboard.filter(entry => entry.pool === selectedPool)
     setFilteredLeaderboard(filtered)
@@ -120,11 +125,6 @@ export default function PublicLeaderboardPage() {
       setSelectedPool(uniquePools[0] || '')
     }
   }, [uniquePools, selectedPool])
-
-  const uniquePools = useMemo(() => 
-    [...new Set(leaderboard.map(entry => entry.pool).filter(p => p !== null))].sort(),
-    [leaderboard]
-  )
 
   const getRankColor = (index: number) => {
     if (index === 0) return 'text-yellow-400' // Gold
