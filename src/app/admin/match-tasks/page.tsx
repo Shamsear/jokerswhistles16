@@ -16,7 +16,8 @@ import {
   Filter,
   RefreshCw,
   Search,
-  X as XIcon
+  X as XIcon,
+  RotateCcw
 } from 'lucide-react'
 
 interface Tournament {
@@ -67,6 +68,7 @@ export default function MatchTasksAdmin() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [allRounds, setAllRounds] = useState<number[]>([])
+  const [resettingMatchId, setResettingMatchId] = useState<string | null>(null)
   
   // Filters
   const [selectedPool, setSelectedPool] = useState<string>('all')
@@ -250,6 +252,41 @@ export default function MatchTasksAdmin() {
 
   const openMatchLink = (matchId: string) => {
     window.open(`/match/${matchId}/task`, '_blank')
+  }
+
+  const resetMatchTask = async (matchId: string) => {
+    if (!confirm('Are you sure you want to reset the task assignment for this match? The link will become active again and players can pick a new task.')) {
+      return
+    }
+
+    setResettingMatchId(matchId)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch(`/api/match-tasks?matchId=${matchId}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess('Task reset successfully! The link is now active again.')
+        // Refresh matches to show updated state
+        if (activeTournament && selectedRound !== null) {
+          await fetchMatches(activeTournament.id, selectedRound)
+        }
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError(data.error || 'Failed to reset task')
+        setTimeout(() => setError(''), 3000)
+      }
+    } catch (err) {
+      setError('Failed to connect to server')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setResettingMatchId(null)
+    }
   }
 
   const getUniquePools = () => {
@@ -630,10 +667,25 @@ export default function MatchTasksAdmin() {
                               </button>
                             </>
                           ) : (
-                            // Show completed indicator
-                            <div className="px-3 sm:px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs sm:text-sm font-semibold text-center">
-                              ✓ Complete
-                            </div>
+                            // Show reset button for assigned tasks
+                            <>
+                              <div className="flex-1 lg:flex-none px-3 sm:px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs sm:text-sm font-semibold text-center">
+                                ✓ Complete
+                              </div>
+                              <button
+                                onClick={() => resetMatchTask(match.id)}
+                                disabled={resettingMatchId === match.id}
+                                className="flex-1 lg:flex-none flex items-center justify-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 active:bg-orange-500/40 border border-orange-500/30 rounded-lg transition-all text-orange-400 font-semibold text-xs sm:text-sm touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Reset task assignment to allow players to pick again"
+                              >
+                                {resettingMatchId === match.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                )}
+                                <span>Reset</span>
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>

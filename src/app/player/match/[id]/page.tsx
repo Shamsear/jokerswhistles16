@@ -24,13 +24,15 @@ interface Match {
   awayScore: number | null
   status: string
   tournament: { id: string; name: string; phase: number }
-  taskAssignments: Array<{
+  matchTasks: Array<{
     id: string
-    player: { id: string; name: string }
+    playerId: string
+    playerType: string  // 'home' or 'away'
     task: {
       id: string
-      description: string
-      type: string
+      name: string
+      homeDescription: string
+      awayDescription: string
     }
   }>
 }
@@ -97,8 +99,8 @@ export default function MatchDetailsPage() {
     if (!match || !currentPlayer) return
 
     // Check if player already has a task for this match
-    const playerTask = match.taskAssignments.find(
-      (a) => a.player.id === currentPlayer.id
+    const playerTask = match.matchTasks.find(
+      (t) => t.playerId === currentPlayer.id
     )
 
     if (playerTask) {
@@ -227,8 +229,8 @@ export default function MatchDetailsPage() {
 
   const isHomePlayer = currentPlayer.id === match.homePlayer.id
   const isAwayPlayer = currentPlayer.id === match.awayPlayer.id
-  const playerTask = match.taskAssignments.find(a => a.player.id === currentPlayer.id)
-  const opponentTask = match.taskAssignments.find(a => a.player.id !== currentPlayer.id)
+  const playerTask = match.matchTasks.find(t => t.playerId === currentPlayer.id)
+  const opponentTask = match.matchTasks.find(t => t.playerId !== currentPlayer.id)
   const canSpinForTask = match.tournament.phase >= 5 && !playerTask
 
   return (
@@ -321,19 +323,22 @@ export default function MatchDetailsPage() {
           <div className="mb-4">
             <h4 className="font-medium text-gray-700 mb-2">Your Task:</h4>
             {playerTask ? (
-              <div className={`p-4 rounded-lg ${
-                playerTask.task.type === 'positive' ? 'bg-green-50' : 'bg-red-50'
-              }`}>
+              <div className="p-4 rounded-lg bg-blue-50 border-2 border-blue-200">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded mb-2 ${
-                      playerTask.task.type === 'positive'
-                        ? 'bg-green-200 text-green-800'
-                        : 'bg-red-200 text-red-800'
-                    }`}>
-                      {playerTask.task.type === 'positive' ? '✓ Positive' : '✗ Negative'}
+                  <div className="w-full">
+                    <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded mb-3 bg-blue-200 text-blue-800">
+                      {playerTask.task.name}
                     </span>
-                    <p className="text-gray-900">{playerTask.task.description}</p>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs font-semibold text-green-700 uppercase block mb-1">🏠 Home Player:</span>
+                        <p className="text-gray-900">{playerTask.task.homeDescription}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-blue-700 uppercase block mb-1">✈️ Away Player:</span>
+                        <p className="text-gray-900">{playerTask.task.awayDescription}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -358,17 +363,22 @@ export default function MatchDetailsPage() {
           {opponentTask && (
             <div>
               <h4 className="font-medium text-gray-700 mb-2">Opponent's Task:</h4>
-              <div className={`p-4 rounded-lg ${
-                opponentTask.task.type === 'positive' ? 'bg-green-50' : 'bg-red-50'
-              }`}>
-                <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded mb-2 ${
-                  opponentTask.task.type === 'positive'
-                    ? 'bg-green-200 text-green-800'
-                    : 'bg-red-200 text-red-800'
-                }`}>
-                  {opponentTask.task.type === 'positive' ? '✓ Positive' : '✗ Negative'}
-                </span>
-                <p className="text-gray-900">{opponentTask.task.description}</p>
+              <div className="p-4 rounded-lg bg-purple-50 border-2 border-purple-200">
+                <div className="w-full">
+                  <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded mb-3 bg-purple-200 text-purple-800">
+                    {opponentTask.task.name}
+                  </span>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-xs font-semibold text-green-700 uppercase block mb-1">🏠 Home Player:</span>
+                      <p className="text-gray-900">{opponentTask.task.homeDescription}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-blue-700 uppercase block mb-1">✈️ Away Player:</span>
+                      <p className="text-gray-900">{opponentTask.task.awayDescription}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

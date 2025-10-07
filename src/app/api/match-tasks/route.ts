@@ -75,3 +75,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch match tasks' }, { status: 500 })
   }
 }
+
+// DELETE - Remove all task assignments for a match (admin reset)
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const matchId = searchParams.get('matchId')
+
+    if (!matchId) {
+      return NextResponse.json({ error: 'Match ID is required' }, { status: 400 })
+    }
+
+    // Delete all match tasks for this match
+    await prisma.matchTask.deleteMany({
+      where: {
+        matchId: matchId
+      }
+    })
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Match tasks reset successfully'
+    })
+  } catch (error) {
+    console.error('Error deleting match tasks:', error)
+    return NextResponse.json({ error: 'Failed to delete match tasks' }, { status: 500 })
+  }
+}

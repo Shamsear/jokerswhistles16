@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Users, Calendar, CheckSquare, Plus, ArrowRight, LogOut, Settings, RefreshCw } from 'lucide-react'
+import { Trophy, Users, Calendar, CheckSquare, Plus, ArrowRight, LogOut, Settings, RefreshCw, ListTodo, History } from 'lucide-react'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* Fixtures Card */}
           <Link
             href="/admin/fixtures"
@@ -211,7 +211,7 @@ export default function AdminDashboard() {
             <p className="text-sm sm:text-base text-slate-400">View and manage match results</p>
           </Link>
 
-          {/* Tasks Card */}
+          {/* Match Tasks Card */}
           <Link
             href="/admin/match-tasks"
             className="group bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 hover:border-yellow-500/50 active:border-yellow-500/70 rounded-xl sm:rounded-2xl p-5 sm:p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
@@ -220,14 +220,27 @@ export default function AdminDashboard() {
               <CheckSquare className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-400 group-hover:scale-110 transition-transform" />
               <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400 opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <h3 className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">Tasks</h3>
+            <h3 className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">Match Tasks</h3>
             <p className="text-sm sm:text-base text-slate-400">Share match task assignment links with players</p>
+          </Link>
+
+          {/* Manage Tasks Card */}
+          <Link
+            href="/admin/tasks"
+            className="group bg-black/30 backdrop-blur-md border-2 border-orange-500/30 hover:border-orange-500/50 active:border-orange-500/70 rounded-xl sm:rounded-2xl p-5 sm:p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
+          >
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <ListTodo className="h-10 w-10 sm:h-12 sm:w-12 text-orange-400 group-hover:scale-110 transition-transform" />
+              <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400 opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">Manage Tasks</h3>
+            <p className="text-sm sm:text-base text-slate-400">Create and edit tournament tasks</p>
           </Link>
 
           {/* Leaderboard Card */}
           <Link
             href="/admin/leaderboard"
-            className="group bg-black/30 backdrop-blur-md border-2 border-emerald-500/30 hover:border-emerald-500/50 active:border-emerald-500/70 rounded-xl sm:rounded-2xl p-5 sm:p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation sm:col-span-2 lg:col-span-1"
+            className="group bg-black/30 backdrop-blur-md border-2 border-emerald-500/30 hover:border-emerald-500/50 active:border-emerald-500/70 rounded-xl sm:rounded-2xl p-5 sm:p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
           >
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <Trophy className="h-10 w-10 sm:h-12 sm:w-12 text-emerald-400 group-hover:scale-110 transition-transform" />
@@ -235,6 +248,19 @@ export default function AdminDashboard() {
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">Leaderboard</h3>
             <p className="text-sm sm:text-base text-slate-400">View standings and share table</p>
+          </Link>
+
+          {/* Task History Card */}
+          <Link
+            href="/admin/task-history"
+            className="group bg-black/30 backdrop-blur-md border-2 border-purple-500/30 hover:border-purple-500/50 active:border-purple-500/70 rounded-xl sm:rounded-2xl p-5 sm:p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
+          >
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <History className="h-10 w-10 sm:h-12 sm:w-12 text-purple-400 group-hover:scale-110 transition-transform" />
+              <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400 opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white mb-1 sm:mb-2">Task History</h3>
+            <p className="text-sm sm:text-base text-slate-400">Track task assignments to players</p>
           </Link>
         </div>
 

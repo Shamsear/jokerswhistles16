@@ -18,8 +18,8 @@ interface Match {
 interface Task {
   id: string
   name: string
-  homePlayerDescription: string
-  awayPlayerDescription: string
+  homeDescription: string
+  awayDescription: string
 }
 
 interface PlayerTaskHistory {
@@ -36,11 +36,12 @@ export default function MatchTaskPage() {
   const [error, setError] = useState('')
   const [match, setMatch] = useState<Match | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [step, setStep] = useState<'identify' | 'select-card' | 'reveal-task'>('identify')
+  const [step, setStep] = useState<'identify' | 'select-card' | 'reveal-task' | 'expired'>('identify')
   const [playerType, setPlayerType] = useState<'home' | 'away' | null>(null)
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
   const [assignedTask, setAssignedTask] = useState<Task | null>(null)
   const [isRevealing, setIsRevealing] = useState(false)
+  const [isExpired, setIsExpired] = useState(false)
 
   useEffect(() => {
     fetchMatchData()
@@ -68,6 +69,22 @@ export default function MatchTaskPage() {
         setTasks(tasksData.tasks)
       }
 
+      // Check if task is already assigned to this match
+      const checkResponse = await fetch(`/api/match-tasks?matchId=${matchId}`)
+      const checkData = await checkResponse.json()
+      
+      if (checkResponse.ok && checkData.matchTasks && checkData.matchTasks.length > 0) {
+        // Task already assigned - show it directly
+        const existingMatchTask = checkData.matchTasks[0]
+        const existingTask = tasksData.tasks.find((t: Task) => t.id === existingMatchTask.taskId)
+        
+        if (existingTask) {
+          setAssignedTask(existingTask)
+          setIsExpired(true)
+          setStep('expired')
+        }
+      }
+
       setLoading(false)
     } catch (err) {
       setError('Failed to connect to server')
@@ -76,11 +93,20 @@ export default function MatchTaskPage() {
   }
 
   const handlePlayerIdentification = (type: 'home' | 'away') => {
+    if (isExpired) {
+      setError('This link has expired. A task has already been assigned to this match.')
+      return
+    }
     setPlayerType(type)
     setStep('select-card')
   }
 
   const handleCardSelection = async (cardNumber: number) => {
+    if (isExpired) {
+      setError('This link has expired. A task has already been assigned to this match.')
+      return
+    }
+
     setSelectedCard(cardNumber)
     setIsRevealing(true)
 
@@ -92,13 +118,13 @@ export default function MatchTaskPage() {
       const checkData = await checkResponse.json()
       
       if (checkResponse.ok && checkData.matchTasks && checkData.matchTasks.length > 0) {
-        // Task already assigned, just show it
+        // Task already assigned - link is now expired
         const existingTask = tasks.find(t => t.id === checkData.matchTasks[0].taskId)
         if (existingTask) {
-          await new Promise(resolve => setTimeout(resolve, 1500))
           setAssignedTask(existingTask)
+          setIsExpired(true)
           setIsRevealing(false)
-          setStep('reveal-task')
+          setStep('expired')
           return
         }
       }
@@ -138,6 +164,7 @@ export default function MatchTaskPage() {
       
       setAssignedTask(randomTask)
       setIsRevealing(false)
+      setIsExpired(true) // Mark link as expired after task selection
       setStep('reveal-task')
 
       // Save task assignment for the MATCH (not individual players)
@@ -320,6 +347,72 @@ export default function MatchTaskPage() {
           </div>
         )}
 
+        {/* Expired State - Show Already Assigned Task */}
+        {step === 'expired' && assignedTask && (
+          <div className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-2xl p-8 w-full max-w-2xl">
+            <div className="text-center mb-6">
+              <Trophy className="h-20 w-20 text-yellow-400 mx-auto mb-4" />
+              <h1 className="text-3xl font-black bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text text-transparent mb-2">
+                TASK ALREADY ASSIGNED
+              </h1>
+              <p className="text-slate-400">
+                {assignedTask.name} - Round {match.round}
+              </p>
+              <div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                <p className="text-yellow-400 text-sm">
+                  🔒 This link has expired. The task has already been selected for this match.
+                </p>
+              </div>
+            </div>
+
+            {/* Home Player's Task */}
+            <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border-2 border-emerald-500/50 rounded-xl p-6 mb-4">
+              <h3 className="text-lg font-bold text-emerald-400 mb-3">
+                🏠 {match.homePlayerName}'s Task
+              </h3>
+              <p className="text-white text-lg leading-relaxed">
+                {assignedTask.homeDescription}
+              </p>
+            </div>
+
+            {/* Away Player's Task */}
+            <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border-2 border-purple-500/50 rounded-xl p-6 mb-6">
+              <h3 className="text-lg font-bold text-purple-400 mb-3">
+                ✈️ {match.awayPlayerName}'s Task
+              </h3>
+              <p className="text-white text-lg leading-relaxed">
+                {assignedTask.awayDescription}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                onClick={() => {
+                  const message = `🏆 *Match Tasks - Round ${match.round}*\n\n` +
+                    `*${assignedTask.name}*\n\n` +
+                    `🏠 *${match.homePlayerName}:*\n${assignedTask.homeDescription}\n\n` +
+                    `✈️ *${match.awayPlayerName}:*\n${assignedTask.awayDescription}\n\n` +
+                    `Good luck! 🎮`
+                  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+                  window.open(whatsappUrl, '_blank')
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-green-500/50 flex items-center justify-center space-x-2"
+              >
+                <Share2 className="h-5 w-5" />
+                <span>Share to WhatsApp</span>
+              </button>
+
+              <button
+                onClick={() => router.push('/')}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black font-bold rounded-xl transition-all shadow-xl shadow-emerald-500/50 flex items-center justify-center space-x-2"
+              >
+                <span>Done</span>
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Step 3: Task Reveal */}
         {step === 'reveal-task' && assignedTask && (
           <div className="bg-black/30 backdrop-blur-md border-2 border-emerald-500/30 rounded-2xl p-8 w-full max-w-2xl">
@@ -339,7 +432,7 @@ export default function MatchTaskPage() {
                 {playerType === 'home' ? `🏠 ${match.homePlayerName}'s Task (You)` : `✈️ ${match.awayPlayerName}'s Task (You)`}
               </h3>
               <p className="text-white text-lg leading-relaxed">
-                {playerType === 'home' ? assignedTask.homePlayerDescription : assignedTask.awayPlayerDescription}
+                {playerType === 'home' ? assignedTask.homeDescription : assignedTask.awayDescription}
               </p>
             </div>
 
@@ -349,7 +442,7 @@ export default function MatchTaskPage() {
                 {playerType === 'home' ? `✈️ ${match.awayPlayerName}'s Task` : `🏠 ${match.homePlayerName}'s Task`}
               </h3>
               <p className="text-white text-lg leading-relaxed">
-                {playerType === 'home' ? assignedTask.awayPlayerDescription : assignedTask.homePlayerDescription}
+                {playerType === 'home' ? assignedTask.awayDescription : assignedTask.homeDescription}
               </p>
             </div>
 
@@ -364,8 +457,8 @@ export default function MatchTaskPage() {
                 onClick={() => {
                   const message = `🏆 *Match Tasks - Round ${match.round}*\n\n` +
                     `*${assignedTask.name}*\n\n` +
-                    `🏠 *${match.homePlayerName}:*\n${assignedTask.homePlayerDescription}\n\n` +
-                    `✈️ *${match.awayPlayerName}:*\n${assignedTask.awayPlayerDescription}\n\n` +
+                    `🏠 *${match.homePlayerName}:*\n${assignedTask.homeDescription}\n\n` +
+                    `✈️ *${match.awayPlayerName}:*\n${assignedTask.awayDescription}\n\n` +
                     `Good luck! 🎮`
                   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
                   window.open(whatsappUrl, '_blank')

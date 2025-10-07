@@ -832,7 +832,9 @@ export default function LeaderboardPage() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontSize: '12px',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
+                              lineHeight: '28px',
+                              textAlign: 'center'
                             }}>
                               {index + 1}
                             </div>
@@ -850,7 +852,9 @@ export default function LeaderboardPage() {
                               justifyContent: 'center',
                               fontSize: '12px',
                               fontWeight: '700',
-                              color: '#666'
+                              color: '#666',
+                              lineHeight: '32px',
+                              textAlign: 'center'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
@@ -926,7 +930,9 @@ export default function LeaderboardPage() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontSize: '12px',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
+                              lineHeight: '28px',
+                              textAlign: 'center'
                             }}>
                               {index + 1}
                             </div>
@@ -944,7 +950,9 @@ export default function LeaderboardPage() {
                               justifyContent: 'center',
                               fontSize: '12px',
                               fontWeight: '700',
-                              color: '#666'
+                              color: '#666',
+                              lineHeight: '32px',
+                              textAlign: 'center'
                             }}>
                               {entry.player.name.substring(0, 2).toUpperCase()}
                             </div>
@@ -1009,7 +1017,9 @@ export default function LeaderboardPage() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '12px',
-                          fontWeight: 'bold'
+                          fontWeight: 'bold',
+                          lineHeight: '28px',
+                          textAlign: 'center'
                         }}>
                           {index + 1}
                         </div>
@@ -1027,7 +1037,9 @@ export default function LeaderboardPage() {
                           justifyContent: 'center',
                           fontSize: '12px',
                           fontWeight: '700',
-                          color: '#666'
+                          color: '#666',
+                          lineHeight: '32px',
+                          textAlign: 'center'
                         }}>
                           {entry.player.name.substring(0, 2).toUpperCase()}
                         </div>

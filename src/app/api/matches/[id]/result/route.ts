@@ -68,10 +68,9 @@ export async function POST(
       include: {
         homePlayer: true,
         awayPlayer: true,
-        taskAssignments: {
+        matchTasks: {
           include: {
-            task: true,
-            player: true
+            task: true
           }
         }
       }
@@ -96,10 +95,9 @@ export async function GET(
       include: {
         homePlayer: true,
         awayPlayer: true,
-        taskAssignments: {
+        matchTasks: {
           include: {
-            task: true,
-            player: true
+            task: true
           }
         },
         tournament: true
