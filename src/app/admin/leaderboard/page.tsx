@@ -365,29 +365,42 @@ export default function LeaderboardPage() {
     try {
       const canvas = await generateCanvas()
       
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (blob) {
           const file = new File([blob], 'leaderboard.png', { type: 'image/png' })
           
+          // Check if Web Share API is available and supports files
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            navigator.share({
-              title: `${activeTournament?.name} - Leaderboard`,
-              text: 'Tournament Leaderboard',
-              files: [file]
-            }).then(() => {
+            try {
+              await navigator.share({
+                title: `${activeTournament?.name} - Leaderboard`,
+                text: 'Tournament Leaderboard',
+                files: [file]
+              })
               setSuccess('Leaderboard shared successfully!')
               setTimeout(() => setSuccess(''), 3000)
-            }).catch(() => {
-              setError('Share cancelled or failed')
-              setTimeout(() => setError(''), 3000)
-            })
+              setIsGeneratingImage(false)
+              setIsShareModalOpen(false)
+            } catch (shareErr: any) {
+              // Check if user just cancelled the share
+              if (shareErr.name === 'AbortError') {
+                // User cancelled - just close modal without error
+                setIsGeneratingImage(false)
+                setIsShareModalOpen(false)
+              } else {
+                console.error('Share failed:', shareErr)
+                setError('Share failed. Please try downloading instead.')
+                setTimeout(() => setError(''), 3000)
+                setIsGeneratingImage(false)
+              }
+            }
           } else {
-            setError('Sharing not supported on this device')
-            setTimeout(() => setError(''), 3000)
+            // Sharing not supported - automatically download instead
+            downloadImage(canvas)
+            setIsGeneratingImage(false)
+            setIsShareModalOpen(false)
           }
         }
-        setIsGeneratingImage(false)
-        setIsShareModalOpen(false)
       }, 'image/png')
     } catch (err) {
       console.error('Failed to generate image:', err)
@@ -749,7 +762,8 @@ export default function LeaderboardPage() {
           <div className="bg-black/90 border-2 border-yellow-500/30 rounded-2xl p-6 max-w-md w-full">
             <h3 className="text-xl font-bold text-white mb-4">Export Leaderboard</h3>
             <p className="text-slate-400 text-sm mb-6">
-              Share directly or download the leaderboard as an image.
+              <span className="font-semibold text-slate-300">Share:</span> Share directly via social apps (mobile devices).<br/>
+              <span className="font-semibold text-slate-300">Download:</span> Save the leaderboard image to your device.
             </p>
             
             <div className="flex flex-col gap-3">

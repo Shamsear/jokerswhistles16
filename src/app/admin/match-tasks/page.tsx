@@ -17,7 +17,9 @@ import {
   RefreshCw,
   Search,
   X as XIcon,
-  RotateCcw
+  RotateCcw,
+  Share2,
+  MessageCircle
 } from 'lucide-react'
 
 interface Tournament {
@@ -69,6 +71,10 @@ export default function MatchTasksAdmin() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [allRounds, setAllRounds] = useState<number[]>([])
   const [resettingMatchId, setResettingMatchId] = useState<string | null>(null)
+  const [sharingPool, setSharingPool] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [sharePreviewMessage, setSharePreviewMessage] = useState('')
+  const [shareWhatsAppURL, setShareWhatsAppURL] = useState('')
   
   // Filters
   const [selectedPool, setSelectedPool] = useState<string>('all')
@@ -292,6 +298,92 @@ export default function MatchTasksAdmin() {
   const getUniquePools = () => {
     const pools = [...new Set(matches.map(m => m.pool).filter(p => p !== null))]
     return pools.sort()
+  }
+
+  const prepareShareMessage = (poolFilter?: string | null) => {
+    const poolKey = poolFilter === null ? 'no-pool' : (poolFilter || 'all')
+    setSharingPool(poolKey)
+    
+    // Filter matches by pool if specified
+    const matchesToShare = poolFilter !== undefined 
+      ? filteredMatches.filter(m => m.pool === poolFilter)
+      : filteredMatches
+    
+    if (matchesToShare.length === 0) {
+      setError('No matches to share for this pool')
+      setTimeout(() => setError(''), 3000)
+      setSharingPool(null)
+      return
+    }
+    
+    try {
+      const baseURL = typeof window !== 'undefined' ? window.location.origin : ''
+      
+      let message = `*${activeTournament?.name}*\n`
+      message += `*Round ${selectedRound}`
+      
+      // Add pool info if sharing specific pool
+      if (poolFilter !== undefined) {
+        message += poolFilter ? ` - Pool ${poolFilter}` : ` - No Pool`
+      }
+      message += `*\n\n`
+      
+      // Only include pending matches (not completed ones) to reduce message size
+      const pendingMatches = matchesToShare.filter(m => !m.matchTasks || m.matchTasks.length === 0)
+      const completedMatches = matchesToShare.filter(m => m.matchTasks && m.matchTasks.length > 0)
+      
+      if (pendingMatches.length > 0) {
+        message += `*Pending Matches:*\n`
+        pendingMatches.forEach((match, index) => {
+          message += `${index + 1}. ${match.homePlayer.name} vs ${match.awayPlayer.name}\n`
+          message += `${baseURL}/match/${match.id}/task\n\n`
+        })
+      }
+      
+      if (completedMatches.length > 0) {
+        message += `\n*Completed:* ${completedMatches.length} match${completedMatches.length > 1 ? 'es' : ''}\n`
+        completedMatches.forEach((match) => {
+          const taskInfo = match.matchTasks![0]
+          message += `- ${match.homePlayer.name} vs ${match.awayPlayer.name} (${taskInfo.task.name})\n`
+        })
+      }
+      
+      message += `\nTotal: ${matchesToShare.length} | Pending: ${pendingMatches.length}`
+      
+      const encodedMessage = encodeURIComponent(message)
+      const whatsappURL = `https://wa.me/?text=${encodedMessage}`
+      
+      setSharePreviewMessage(message)
+      setShareWhatsAppURL(whatsappURL)
+      setShowShareModal(true)
+      setSharingPool(null)
+    } catch (err) {
+      console.error('Error preparing share:', err)
+      setError('Failed to prepare message. Please try again.')
+      setTimeout(() => setError(''), 3000)
+      setSharingPool(null)
+    }
+  }
+  
+  const confirmShareWhatsApp = () => {
+    try {
+      // Use anchor element to avoid pop-up blocker
+      const link = document.createElement('a')
+      link.href = shareWhatsAppURL
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      setShowShareModal(false)
+      setSuccess('Opening WhatsApp...')
+      setTimeout(() => setSuccess(''), 2000)
+    } catch (err) {
+      console.error('Error sharing:', err)
+      setError('Failed to share. Please try again.')
+      setTimeout(() => setError(''), 3000)
+    }
   }
 
   if (!isAuthenticated) {
@@ -564,16 +656,60 @@ export default function MatchTasksAdmin() {
           </div>
         )}
 
-        {/* Matches List */}
-        {activeTournament && (
-          <div className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold bg-gradient-to-r from-yellow-400 to-emerald-400 bg-clip-text text-transparent mb-3 sm:mb-4">
-              Match Links ({filteredMatches.length})
-            </h3>
-            
-            {filteredMatches.length > 0 ? (
-              <div className="space-y-3 sm:space-y-3">
-                {filteredMatches.map((match) => {
+        {/* Matches List - Grouped by Pool */}
+        {activeTournament && filteredMatches.length > 0 && (() => {
+          // Group matches by pool
+          const poolGroups = filteredMatches.reduce((groups, match) => {
+            const pool = match.pool || null
+            const poolKey = pool || 'no-pool'
+            if (!groups[poolKey]) groups[poolKey] = []
+            groups[poolKey].push(match)
+            return groups
+          }, {} as Record<string, Match[]>)
+          
+          const sortedPools = Object.keys(poolGroups).sort((a, b) => {
+            if (a === 'no-pool') return 1
+            if (b === 'no-pool') return -1
+            return a.localeCompare(b)
+          })
+          
+          return (
+            <div className="space-y-4 sm:space-y-6">
+              {sortedPools.map((poolKey) => {
+                const poolMatches = poolGroups[poolKey]
+                const poolName = poolKey === 'no-pool' ? null : poolKey
+                const displayPoolName = poolKey === 'no-pool' ? 'No Pool' : `Pool ${poolKey}`
+                
+                return (
+                  <div key={poolKey} className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <h3 className="text-base sm:text-lg font-semibold bg-gradient-to-r from-yellow-400 to-emerald-400 bg-clip-text text-transparent">
+                          {displayPoolName}
+                        </h3>
+                        <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-xs font-bold text-blue-400">
+                          {poolMatches.length} {poolMatches.length === 1 ? 'Match' : 'Matches'}
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={() => prepareShareMessage(poolName)}
+                        disabled={sharingPool === poolKey}
+                        className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-green-600/20 hover:bg-green-600/30 border border-green-600/30 rounded-lg sm:rounded-xl transition-all text-green-400 font-semibold text-xs sm:text-sm w-full sm:w-auto touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={`Share ${displayPoolName} links via WhatsApp`}
+                      >
+                        {sharingPool === poolKey ? (
+                          <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                        ) : (
+                          <MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        )}
+                        <span>{sharingPool === poolKey ? 'Preparing...' : `Share ${displayPoolName}`}</span>
+                      </button>
+                    </div>
+                    
+                    {/* Pool matches */}
+                    <div className="space-y-3 sm:space-y-3">
+                      {poolMatches.map((match) => {
                   const hasTask = match.matchTasks && match.matchTasks.length > 0
                   const taskInfo = hasTask && match.matchTasks ? match.matchTasks[0] : null
                   const pickedByPlayer = hasTask && match.matchTasks && match.matchTasks[0]?.playerId
@@ -692,17 +828,82 @@ export default function MatchTasksAdmin() {
                     </div>
                   )
                 })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+        
+        {/* No Matches Message */}
+        {activeTournament && filteredMatches.length === 0 && (
+          <div className="bg-black/30 backdrop-blur-md border-2 border-yellow-500/30 rounded-xl sm:rounded-2xl p-6 sm:p-8">
+            <div className="text-center py-8 sm:py-12">
+              <CheckSquare className="h-12 w-12 sm:h-16 sm:w-16 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400 text-sm sm:text-base px-4">
+                {matches.length === 0 
+                  ? 'No matches found. Create matches first in the opponent draw.'
+                  : 'No matches match your filter criteria.'}
+              </p>
+            </div>
+          </div>
+        )}
+        {/* Share Preview Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-gradient-to-br from-slate-900 via-black to-slate-900 border-2 border-yellow-500/50 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl shadow-yellow-500/20 animate-in zoom-in-95 duration-200">
+              {/* Modal Header */}
+              <div className="bg-black/40 border-b border-yellow-500/30 px-4 sm:px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-400" />
+                  <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-yellow-400 to-emerald-400 bg-clip-text text-transparent">
+                    Share via WhatsApp
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="p-2 hover:bg-slate-800/50 rounded-lg transition-all text-slate-400 hover:text-white"
+                >
+                  <XIcon className="h-5 w-5" />
+                </button>
               </div>
-            ) : (
-              <div className="text-center py-8 sm:py-12">
-                <CheckSquare className="h-12 w-12 sm:h-16 sm:w-16 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400 text-sm sm:text-base px-4">
-                  {matches.length === 0 
-                    ? 'No matches found. Create matches first in the opponent draw.'
-                    : 'No matches match your filter criteria.'}
-                </p>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh]">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 sm:p-5">
+                  <p className="text-xs sm:text-sm text-slate-400 mb-3 font-semibold">Message Preview:</p>
+                  <div className="bg-black/40 border border-slate-700/50 rounded-lg p-3 sm:p-4">
+                    <pre className="text-xs sm:text-sm text-white whitespace-pre-wrap font-mono leading-relaxed">
+                      {sharePreviewMessage}
+                    </pre>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 sm:p-4">
+                  <p className="text-xs sm:text-sm text-blue-300">
+                    <strong>📱 Note:</strong> This will open WhatsApp with the message pre-filled. You can still edit or choose recipients before sending.
+                  </p>
+                </div>
               </div>
-            )}
+
+              {/* Modal Footer */}
+              <div className="bg-black/40 border-t border-yellow-500/30 px-4 sm:px-6 py-4 flex flex-col sm:flex-row gap-3 sm:gap-2 sm:justify-end">
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-700/50 hover:bg-slate-700/70 border border-slate-600/50 rounded-lg sm:rounded-xl text-white font-semibold text-sm transition-all order-2 sm:order-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmShareWhatsApp}
+                  className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 rounded-lg sm:rounded-xl text-white font-bold text-sm transition-all shadow-lg shadow-green-500/30 flex items-center justify-center space-x-2 order-1 sm:order-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Open WhatsApp</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>
