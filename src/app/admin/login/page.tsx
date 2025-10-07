@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Lock, Loader2, AlertCircle, Shield, ArrowLeft } from 'lucide-react'
+import { Lock, Loader2, AlertCircle, Shield, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -20,16 +21,16 @@ export default function AdminLogin() {
 
     try {
       // Simple credential check (in production, use proper authentication)
-      if (email === process.env.NEXT_PUBLIC_ADMIN_EMAIL || email === 'admin@tournament.com') {
+      if (username === process.env.NEXT_PUBLIC_ADMIN_USERNAME || username === 'admin') {
         if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'ssleagues16admin') {
           // Store admin session
           sessionStorage.setItem('adminAuth', 'true')
           router.push('/admin')
         } else {
-          setError('Invalid email or password')
+          setError('Invalid username or password')
         }
       } else {
-        setError('Invalid email or password')
+        setError('Invalid username or password')
       }
     } catch (err) {
       setError('Login failed. Please try again.')
@@ -89,7 +90,7 @@ export default function AdminLogin() {
             </h2>
           </div>
           <p className="text-center text-slate-400 mb-8 text-sm">
-            Enter credentials to access tournament control panel
+            Enter your credentials to access the control panel
           </p>
 
           {/* Error Alert */}
@@ -105,18 +106,19 @@ export default function AdminLogin() {
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-bold text-emerald-400 mb-2">
-                Email Address
+              <label htmlFor="username" className="block text-sm font-bold text-emerald-400 mb-2">
+                Username
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 bg-black/50 border-2 border-emerald-500/30 rounded-xl focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all text-white placeholder-slate-500"
-                placeholder="admin@tournament.com"
+                placeholder=""
                 required
                 disabled={loading}
+                autoComplete="username"
               />
             </div>
 
@@ -124,16 +126,31 @@ export default function AdminLogin() {
               <label htmlFor="password" className="block text-sm font-bold text-emerald-400 mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-emerald-500/30 rounded-xl focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all text-white placeholder-slate-500"
-                placeholder="••••••••"
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 bg-black/50 border-2 border-emerald-500/30 rounded-xl focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all text-white placeholder-slate-500"
+                  placeholder=""
+                  required
+                  disabled={loading}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-300 transition-colors focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button
