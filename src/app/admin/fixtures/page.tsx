@@ -839,7 +839,7 @@ export default function FixturesManagement() {
                 className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 md:py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-500/50 rounded-xl transition-all text-black font-bold shadow-lg shadow-yellow-500/30 text-sm md:text-base"
               >
                 <Share2 className="h-4 w-4" />
-                <span>Share Round {selectedRound} Fixtures</span>
+                <span>Share Fixtures (Round {selectedRound})</span>
               </button>
             </div>
 

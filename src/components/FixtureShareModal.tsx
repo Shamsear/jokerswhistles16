@@ -16,6 +16,9 @@ interface Match {
   pool: string | null
   homePlayer: Player
   awayPlayer: Player
+  status: string
+  homeScore: number | null
+  awayScore: number | null
 }
 
 interface FixtureShareModalProps {
@@ -34,6 +37,7 @@ export default function FixtureShareModal({
   selectedRound
 }: FixtureShareModalProps) {
   const [selectedPool, setSelectedPool] = useState<string>('all')
+  const [selectedStatus, setSelectedStatus] = useState<string>('pending')
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const fixtureRef = useRef<HTMLDivElement>(null)
@@ -41,6 +45,12 @@ export default function FixtureShareModal({
   const getFilteredMatches = () => {
     let filtered = [...matches]
 
+    // Filter by status
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(m => m.status === selectedStatus)
+    }
+
+    // Filter by pool
     if (selectedPool !== 'all') {
       filtered = filtered.filter(m => m.pool === selectedPool)
     }
@@ -121,7 +131,9 @@ export default function FixtureShareModal({
           const url = URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = `fixtures-round-${selectedRound}-${selectedPool !== 'all' ? `pool-${selectedPool}` : 'all-pools'}.png`
+          const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus}` : ''
+          const poolSuffix = selectedPool !== 'all' ? `-pool-${selectedPool}` : '-all-pools'
+          link.download = `fixtures-round-${selectedRound}${statusSuffix}${poolSuffix}.png`
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
@@ -209,10 +221,12 @@ export default function FixtureShareModal({
                 })
                 
                 // Also download the image since we couldn't share it
+                const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus}` : ''
+                const poolSuffix = selectedPool !== 'all' ? `-pool-${selectedPool}` : '-all-pools'
                 const url = URL.createObjectURL(blob)
                 const link = document.createElement('a')
                 link.href = url
-                link.download = `fixtures-round-${selectedRound}.png`
+                link.download = `fixtures-round-${selectedRound}${statusSuffix}${poolSuffix}.png`
                 document.body.appendChild(link)
                 link.click()
                 document.body.removeChild(link)
@@ -223,10 +237,12 @@ export default function FixtureShareModal({
               if (err.name !== 'AbortError') {
                 console.error('Share failed:', err)
                 // Fallback to download
+                const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus}` : ''
+                const poolSuffix = selectedPool !== 'all' ? `-pool-${selectedPool}` : '-all-pools'
                 const url = URL.createObjectURL(blob)
                 const link = document.createElement('a')
                 link.href = url
-                link.download = `fixtures-round-${selectedRound}.png`
+                link.download = `fixtures-round-${selectedRound}${statusSuffix}${poolSuffix}.png`
                 document.body.appendChild(link)
                 link.click()
                 document.body.removeChild(link)
@@ -235,10 +251,12 @@ export default function FixtureShareModal({
             }
           } else {
             // Fallback to download if sharing not supported (desktop)
+            const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus}` : ''
+            const poolSuffix = selectedPool !== 'all' ? `-pool-${selectedPool}` : '-all-pools'
             const url = URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
-            link.download = `fixtures-round-${selectedRound}.png`
+            link.download = `fixtures-round-${selectedRound}${statusSuffix}${poolSuffix}.png`
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
@@ -284,32 +302,58 @@ export default function FixtureShareModal({
               <h3 className="text-base sm:text-lg font-semibold text-white">
                 Round {selectedRound}
               </h3>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">{matches.length} matches</p>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">{matches.length} total matches</p>
             </div>
           </div>
           
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-2">Filter by Pool</label>
-            <select
-              value={selectedPool}
-              onChange={(e) => setSelectedPool(e.target.value)}
-              className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base bg-black/20 border-2 border-yellow-500/30 rounded-xl text-white focus:border-yellow-400 focus:ring-2 focus:ring-yellow-500/20 transition-all"
-            >
-              <option value="all">All Pools</option>
-              {getUniquePools().map(pool => (
-                <option key={pool} value={pool || ''}>Pool {pool}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-2">Match Status</label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base bg-black/20 border-2 border-yellow-500/30 rounded-xl text-white focus:border-yellow-400 focus:ring-2 focus:ring-yellow-500/20 transition-all"
+              >
+                <option value="all">All Matches</option>
+                <option value="pending">Pending Matches Only</option>
+                <option value="completed">Completed Matches Only</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-2">Filter by Pool</label>
+              <select
+                value={selectedPool}
+                onChange={(e) => setSelectedPool(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base bg-black/20 border-2 border-yellow-500/30 rounded-xl text-white focus:border-yellow-400 focus:ring-2 focus:ring-yellow-500/20 transition-all"
+              >
+                <option value="all">All Pools</option>
+                {getUniquePools().map(pool => (
+                  <option key={pool} value={pool || ''}>Pool {pool}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Preview */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           <div className="mb-3 sm:mb-4">
-            <h3 className="text-xs sm:text-sm font-semibold text-slate-400 mb-2">Preview:</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-400 mb-2">Preview:</h3>
+              <p className="text-xs text-slate-500">
+                {Object.values(groupedMatches).reduce((sum, matches) => sum + matches.length, 0)} matches selected
+              </p>
+            </div>
           </div>
           
           {/* Fixture Card - This will be captured */}
+          {Object.values(groupedMatches).reduce((sum, matches) => sum + matches.length, 0) === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-slate-400 text-sm sm:text-base">No matches match your filter criteria.</p>
+              <p className="text-slate-500 text-xs sm:text-sm mt-2">Try changing the status or pool filter.</p>
+            </div>
+          ) : (
           <div className="flex justify-center">
             <div
               ref={fixtureRef}
@@ -335,6 +379,8 @@ export default function FixtureShareModal({
                 <div style={{ display: 'inline-block', padding: '8px 24px', backgroundColor: '#0c0a09', border: '2px solid rgba(234, 179, 8, 0.5)', borderRadius: '8px' }}>
                   <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px' }}>
                     ROUND {selectedRound}
+                    {selectedStatus === 'pending' && ' - PENDING MATCHES'}
+                    {selectedStatus === 'completed' && ' - RESULTS'}
                   </span>
                 </div>
               </div>
@@ -395,6 +441,7 @@ export default function FixtureShareModal({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Actions */}
