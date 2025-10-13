@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -12,8 +12,15 @@ import {
   Play,
   Crown,
   Users,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  Save,
+  RotateCcw,
+  Share2
 } from 'lucide-react'
+
+// Lazy load the share modal
+const FixtureShareModal = lazy(() => import('@/components/FixtureShareModal'))
 
 interface Tournament {
   id: string
@@ -38,6 +45,7 @@ interface Match {
   awayScore: number | null
   status: string
   winnerId: string | null
+  absentStatus: string | null
   homePlayer: Player
   awayPlayer: Player
 }
@@ -69,6 +77,18 @@ export default function KnockoutManagement() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [knockoutReady, setKnockoutReady] = useState(false)
   const [poolProgress, setPoolProgress] = useState({ completed: 0, total: 0 })
+  
+  // Edit state
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null)
+  const [editHomeScore, setEditHomeScore] = useState<string>('')
+  const [editAwayScore, setEditAwayScore] = useState<string>('')
+  const [savingMatchId, setSavingMatchId] = useState<string | null>(null)
+  const [resettingMatchId, setResettingMatchId] = useState<string | null>(null)
+  const [isSavingToServer, setIsSavingToServer] = useState(false)
+  
+  // Share modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [shareStage, setShareStage] = useState<string>('round_of_16')
 
   // Check authentication
   useEffect(() => {
@@ -168,13 +188,264 @@ export default function KnockoutManagement() {
       if (response.ok) {
         setSuccess(data.message || 'Stage created successfully!')
         await fetchKnockoutMatches(activeTournament.id)
+        setTimeout(() => setSuccess(''), 5000) // Clear after 5 seconds
       } else {
         setError(data.details || data.error || 'Failed to generate stage')
+        setTimeout(() => setError(''), 5000) // Clear after 5 seconds
       }
     } catch (err) {
       setError('Failed to generate knockout stage')
+      setTimeout(() => setError(''), 5000) // Clear after 5 seconds
     } finally {
       setProcessing(false)
+    }
+  }
+
+  const deleteStage = async (stage: string) => {
+    if (!activeTournament) return
+    
+    if (!confirm(`Are you sure you want to delete all ${stage} matches? This cannot be undone.`)) {
+      return
+    }
+    
+    setProcessing(true)
+    setError('')
+    setSuccess('')
+    
+    try {
+      const response = await fetch(`/api/knockout?tournamentId=${activeTournament.id}&stage=${stage}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        setSuccess(data.message || 'Stage deleted successfully!')
+        await fetchKnockoutMatches(activeTournament.id)
+        setTimeout(() => setSuccess(''), 5000)
+      } else {
+        setError(data.details || data.error || 'Failed to delete stage')
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      setError('Failed to delete knockout stage')
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const startEditMatch = (match: Match) => {
+    setEditingMatchId(match.id)
+    setEditHomeScore(match.homeScore?.toString() || '')
+    setEditAwayScore(match.awayScore?.toString() || '')
+  }
+
+  const cancelEdit = () => {
+    setEditingMatchId(null)
+    setEditHomeScore('')
+    setEditAwayScore('')
+  }
+
+  const saveMatchResult = async (matchId: string) => {
+    setSavingMatchId(matchId)
+    setIsSavingToServer(true)
+    
+    const homeScore = editHomeScore !== '' ? parseInt(editHomeScore) : (editAwayScore !== '' ? 0 : null)
+    const awayScore = editAwayScore !== '' ? parseInt(editAwayScore) : (editHomeScore !== '' ? 0 : null)
+    
+    // Optimistic update
+    const optimisticMatches = knockoutMatches.map(match => {
+      if (match.id === matchId) {
+        let status = match.status
+        let winnerId = match.winnerId
+        
+        if (homeScore === null && awayScore === null) {
+          status = 'completed'
+          winnerId = null
+        } else if (homeScore !== null && awayScore !== null) {
+          status = 'completed'
+          winnerId = homeScore > awayScore ? match.homePlayer.id : 
+                    awayScore > homeScore ? match.awayPlayer.id : null
+        } else {
+          status = 'pending'
+          winnerId = null
+        }
+        
+        return {
+          ...match,
+          homeScore,
+          awayScore,
+          status,
+          winnerId,
+          absentStatus: null
+        }
+      }
+      return match
+    })
+    
+    setKnockoutMatches(optimisticMatches)
+    setSuccess('Match result saved!')
+    setEditingMatchId(null)
+    setEditHomeScore('')
+    setEditAwayScore('')
+    
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ homeScore, awayScore })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setIsSavingToServer(false)
+        setTimeout(() => setSuccess(''), 2000)
+      } else {
+        setError(data.error || 'Failed to save match result')
+        if (activeTournament) {
+          fetchKnockoutMatches(activeTournament.id)
+        }
+        setIsSavingToServer(false)
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      setError('Failed to save match result')
+      if (activeTournament) {
+        fetchKnockoutMatches(activeTournament.id)
+      }
+      setIsSavingToServer(false)
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setSavingMatchId(null)
+    }
+  }
+
+  const saveMatchResultWithAbsent = async (matchId: string, homeScoreValue: number | null, awayScoreValue: number | null, absentStatus: string) => {
+    setSavingMatchId(matchId)
+    setIsSavingToServer(true)
+    
+    const optimisticMatches = knockoutMatches.map(match => {
+      if (match.id === matchId) {
+        let status = 'completed'
+        let winnerId = null
+        
+        if (absentStatus === 'both_absent') {
+          winnerId = null
+        } else if (homeScoreValue !== null && awayScoreValue !== null) {
+          winnerId = homeScoreValue > awayScoreValue ? match.homePlayer.id : 
+                    awayScoreValue > homeScoreValue ? match.awayPlayer.id : null
+        }
+        
+        return {
+          ...match,
+          homeScore: homeScoreValue,
+          awayScore: awayScoreValue,
+          status,
+          winnerId,
+          absentStatus
+        }
+      }
+      return match
+    })
+    
+    setKnockoutMatches(optimisticMatches)
+    setSuccess('Match result saved!')
+    setEditingMatchId(null)
+    setEditHomeScore('')
+    setEditAwayScore('')
+    
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ homeScore: homeScoreValue, awayScore: awayScoreValue, absentStatus })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        setIsSavingToServer(false)
+        setTimeout(() => setSuccess(''), 2000)
+      } else {
+        setError(data.error || 'Failed to save match result')
+        if (activeTournament) {
+          fetchKnockoutMatches(activeTournament.id)
+        }
+        setIsSavingToServer(false)
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      setError('Failed to save match result')
+      if (activeTournament) {
+        fetchKnockoutMatches(activeTournament.id)
+      }
+      setIsSavingToServer(false)
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setSavingMatchId(null)
+    }
+  }
+
+  const resetMatchResult = async (matchId: string) => {
+    if (!confirm('Are you sure you want to reset this match to pending? This will clear all scores and mark it as not completed.')) {
+      return
+    }
+
+    setResettingMatchId(matchId)
+    setIsSavingToServer(true)
+    
+    const optimisticMatches = knockoutMatches.map(match => {
+      if (match.id === matchId) {
+        return {
+          ...match,
+          homeScore: null,
+          awayScore: null,
+          status: 'pending',
+          winnerId: null,
+          absentStatus: null
+        }
+      }
+      return match
+    })
+    
+    setKnockoutMatches(optimisticMatches)
+    setSuccess('Match reset to pending!')
+    
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          homeScore: null,
+          awayScore: null,
+          status: 'pending'
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setIsSavingToServer(false)
+        setTimeout(() => setSuccess(''), 2000)
+      } else {
+        setError(data.error || 'Failed to reset match')
+        if (activeTournament) {
+          fetchKnockoutMatches(activeTournament.id)
+        }
+        setIsSavingToServer(false)
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      setError('Failed to reset match')
+      if (activeTournament) {
+        fetchKnockoutMatches(activeTournament.id)
+      }
+      setIsSavingToServer(false)
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setResettingMatchId(null)
     }
   }
 
@@ -226,46 +497,203 @@ export default function KnockoutManagement() {
           : 'border-yellow-500/30 hover:border-yellow-500/50'
       }`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          {match.pool && (
-            <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-xs font-bold text-blue-400">
-              Pool {match.pool}
-            </span>
+      {editingMatchId === match.id ? (
+        // Edit Mode
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                {match.pool && (
+                  <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-xs font-bold text-blue-400">
+                    Pool {match.pool}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-400">{match.homePlayer.name} vs {match.awayPlayer.name}</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-emerald-400 mb-2">
+                🏠 {match.homePlayer.name} Score
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editHomeScore}
+                onChange={(e) => setEditHomeScore(e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-2 bg-black/20 border-2 border-emerald-500/30 rounded-lg text-white placeholder-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-purple-400 mb-2">
+                ✈️ {match.awayPlayer.name} Score
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editAwayScore}
+                onChange={(e) => setEditAwayScore(e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-2 bg-black/20 border-2 border-purple-500/30 rounded-lg text-white placeholder-slate-500 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={async () => {
+                await saveMatchResultWithAbsent(match.id, null, null, 'both_absent')
+              }}
+              disabled={savingMatchId === match.id}
+              className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/30 rounded-lg transition-all text-slate-300 font-semibold text-sm disabled:opacity-50"
+              title="Both players absent - mark as NULL"
+            >
+              <span>NULL (Both Absent)</span>
+            </button>
+            <button
+              onClick={async () => {
+                await saveMatchResultWithAbsent(match.id, 1, 0, 'away_absent')
+              }}
+              disabled={savingMatchId === match.id}
+              className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg transition-all text-emerald-400 font-semibold text-sm disabled:opacity-50"
+              title="Home player wins by walkover"
+            >
+              <span>WO Home</span>
+            </button>
+            <button
+              onClick={async () => {
+                await saveMatchResultWithAbsent(match.id, 0, 1, 'home_absent')
+              }}
+              disabled={savingMatchId === match.id}
+              className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 font-semibold text-sm disabled:opacity-50"
+              title="Away player wins by walkover"
+            >
+              <span>WO Away</span>
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => saveMatchResult(match.id)}
+              disabled={savingMatchId === match.id}
+              className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {savingMatchId === match.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Save Result</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={cancelEdit}
+              disabled={savingMatchId === match.id}
+              className="px-4 py-2 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 font-semibold rounded-lg transition-all disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        // View Mode
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              {match.pool && (
+                <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-xs font-bold text-blue-400">
+                  Pool {match.pool}
+                </span>
+              )}
+              <span className={`px-2 py-1 rounded text-xs font-bold ${
+                match.status === 'completed'
+                  ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400'
+              }`}>
+                {match.status === 'completed' ? '✓ Completed' : 'Pending'}
+              </span>
+            </div>
+          </div>
+          
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center justify-between">
+              <span className={`font-bold truncate ${
+                match.winnerId === match.homePlayer.id ? 'text-emerald-400' : 'text-white'
+              }`}>
+                🏠 {match.homePlayer.name}
+              </span>
+              <span className="text-2xl font-black text-emerald-400">
+                {match.homeScore !== null ? match.homeScore : '-'}
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className={`font-bold truncate ${
+                match.winnerId === match.awayPlayer.id ? 'text-emerald-400' : 'text-white'
+              }`}>
+                ✈️ {match.awayPlayer.name}
+              </span>
+              <span className="text-2xl font-black text-purple-400">
+                {match.awayScore !== null ? match.awayScore : '-'}
+              </span>
+            </div>
+          </div>
+
+          {match.winnerId && (
+            <p className="text-xs text-emerald-400 mb-3">
+              Winner: {match.winnerId === match.homePlayer.id ? match.homePlayer.name : match.awayPlayer.name}
+              {match.absentStatus && match.absentStatus !== 'both_absent' ? (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 text-xs font-bold">WO</span>
+              ) : null}
+            </p>
           )}
-          <span className={`px-2 py-1 rounded text-xs font-bold ${
-            match.status === 'completed'
-              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-              : 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400'
-          }`}>
-            {match.status === 'completed' ? '✓ Completed' : 'Pending'}
-          </span>
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className={`font-bold truncate ${
-            match.winnerId === match.homePlayer.id ? 'text-emerald-400' : 'text-white'
-          }`}>
-            🏠 {match.homePlayer.name}
-          </span>
-          <span className="text-2xl font-black text-emerald-400">
-            {match.homeScore !== null ? match.homeScore : '-'}
-          </span>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <span className={`font-bold truncate ${
-            match.winnerId === match.awayPlayer.id ? 'text-emerald-400' : 'text-white'
-          }`}>
-            ✈️ {match.awayPlayer.name}
-          </span>
-          <span className="text-2xl font-black text-purple-400">
-            {match.awayScore !== null ? match.awayScore : '-'}
-          </span>
-        </div>
-      </div>
+          {match.status === 'completed' && match.absentStatus === 'both_absent' && (
+            <p className="text-xs text-slate-400 mb-3">
+              <span className="px-2 py-0.5 bg-slate-500/20 border border-slate-500/30 rounded text-slate-300 text-xs font-bold">NULL</span>
+              <span className="ml-2">Both players absent</span>
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => startEditMatch(match)}
+              className="flex-1 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 font-semibold text-sm"
+            >
+              {match.status === 'completed' ? 'Edit' : 'Enter Result'}
+            </button>
+            
+            {match.status === 'completed' && (
+              <button
+                onClick={() => resetMatchResult(match.id)}
+                disabled={resettingMatchId === match.id}
+                className="flex items-center justify-center space-x-1.5 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 rounded-lg transition-all text-orange-400 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Reset match to pending"
+              >
+                {resettingMatchId === match.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-xs">Resetting...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    <span className="text-xs">Reset</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 
@@ -287,31 +715,64 @@ export default function KnockoutManagement() {
             </h3>
           </div>
           
-          {!stageExists && canGenerate && (
-            <button
-              onClick={() => generateStage(stage.key)}
-              disabled={processing}
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black font-bold rounded-xl transition-all disabled:opacity-50"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  <span>Generate {stage.name}</span>
-                </>
-              )}
-            </button>
-          )}
-          
-          {!stageExists && !canGenerate && (
-            <span className="text-sm text-slate-500">
-              Complete previous stage first
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {!stageExists && canGenerate && (
+              <button
+                onClick={() => generateStage(stage.key)}
+                disabled={processing}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black font-bold rounded-xl transition-all disabled:opacity-50"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4" />
+                    <span>Generate {stage.name}</span>
+                  </>
+                )}
+              </button>
+            )}
+            
+            {stageExists && (
+              <>
+                <button
+                  onClick={() => {
+                    setShareStage(stage.key)
+                    setIsShareModalOpen(true)
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 border border-yellow-500/50 rounded-xl transition-all text-black font-bold shadow-lg shadow-yellow-500/30"
+                  title="Share this stage"
+                >
+                  <Share2 className="h-4 w-4" />
+                  <span>Share</span>
+                </button>
+                <button
+                  onClick={() => deleteStage(stage.key)}
+                  disabled={processing}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-bold rounded-xl transition-all disabled:opacity-50"
+                  title="Delete this stage"
+                >
+                  {processing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      <span>Delete</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+            
+            {!stageExists && !canGenerate && (
+              <span className="text-sm text-slate-500">
+                Complete previous stage first
+              </span>
+            )}
+          </div>
         </div>
         
         {isMegaFinal && megaFinalMatch ? (
@@ -488,6 +949,26 @@ export default function KnockoutManagement() {
           {knockoutStages.map(renderStageSection)}
         </div>
       </main>
+      
+      {/* Share Modal - Lazy loaded */}
+      {activeTournament && isShareModalOpen && (
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="flex items-center space-x-2 text-yellow-400">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Loading...</span>
+            </div>
+          </div>
+        }>
+          <FixtureShareModal
+            isOpen={isShareModalOpen}
+            onClose={() => setIsShareModalOpen(false)}
+            matches={knockoutMatches.filter(m => m.knockoutStage === shareStage)}
+            tournamentName={activeTournament.name}
+            selectedRound={shareStage}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

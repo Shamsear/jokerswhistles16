@@ -88,7 +88,7 @@ model Match {
   spinResults     SpinResult[]
   matchTasks      MatchTask[]
 
-  @@unique([homePlayerId, awayPlayerId])
+  // Removed unique constraint on [homePlayerId, awayPlayerId] to allow rematches in knockout stages
   @@map("matches")
 }
 

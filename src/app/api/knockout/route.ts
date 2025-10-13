@@ -61,7 +61,15 @@ export async function POST(request: NextRequest) {
 
     // If stage is specified, generate that specific stage
     if (stage) {
-      const createdMatches = await generateKnockoutStage(tournament, stage)
+      let createdMatches
+      
+      // Round of 16 is the initial knockout stage, handle it separately
+      if (stage === 'round_of_16') {
+        createdMatches = await generateRoundOf16(tournament)
+      } else {
+        createdMatches = await generateKnockoutStage(tournament, stage)
+      }
+      
       return NextResponse.json({ 
         success: true, 
         matches: createdMatches,
@@ -166,6 +174,28 @@ async function calculateStandings(tournamentId: string, pool: string) {
 
 // Generate Round of 16 matches
 async function generateRoundOf16(tournament: any) {
+  // Check if Round of 16 matches already exist - be very thorough
+  const existingMatches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      OR: [
+        { knockoutStage: 'round_of_16' },
+        { round: 7, matchType: 'round_of_16' },
+        { round: 7 } // Check for any round 7 matches
+      ]
+    }
+  })
+
+  if (existingMatches.length > 0) {
+    console.log('Found existing Round of 16 matches:', existingMatches.map(m => ({
+      id: m.id,
+      round: m.round,
+      matchType: m.matchType,
+      knockoutStage: m.knockoutStage
+    })))
+    throw new Error(`Round of 16 matches have already been generated (${existingMatches.length} matches found). Delete existing knockout matches first if you want to regenerate.`)
+  }
+
   const poolA = await calculateStandings(tournament.id, 'A')
   const poolB = await calculateStandings(tournament.id, 'B')
 
@@ -234,6 +264,18 @@ async function generateRoundOf16(tournament: any) {
 
 // Generate subsequent knockout stages
 async function generateKnockoutStage(tournament: any, stage: string) {
+  // Check if this stage has already been generated
+  const existingMatches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      knockoutStage: stage
+    }
+  })
+
+  if (existingMatches.length > 0) {
+    throw new Error(`${stage} matches have already been generated`)
+  }
+
   const previousStage = getPreviousStage(stage)
   if (!previousStage) {
     throw new Error('Invalid stage')
@@ -382,4 +424,53 @@ function getRoundNumber(stage: string): number {
     'mega_final': 11
   }
   return rounds[stage] || 7
+}
+
+// DELETE - Remove knockout stage matches (for regeneration)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const tournamentId = searchParams.get('tournamentId')
+    const stage = searchParams.get('stage')
+    
+    if (!tournamentId) {
+      return NextResponse.json({ error: 'Tournament ID is required' }, { status: 400 })
+    }
+
+    // If stage is specified, delete only that stage
+    if (stage) {
+      const deleted = await prisma.match.deleteMany({
+        where: {
+          tournamentId,
+          knockoutStage: stage
+        }
+      })
+      
+      return NextResponse.json({ 
+        success: true, 
+        deletedCount: deleted.count,
+        message: `${deleted.count} ${stage} matches deleted`
+      })
+    }
+    
+    // Otherwise, delete all knockout matches
+    const deleted = await prisma.match.deleteMany({
+      where: {
+        tournamentId,
+        knockoutStage: { not: null }
+      }
+    })
+    
+    return NextResponse.json({ 
+      success: true, 
+      deletedCount: deleted.count,
+      message: `All ${deleted.count} knockout matches deleted`
+    })
+  } catch (error) {
+    console.error('Error deleting knockout matches:', error)
+    return NextResponse.json({ 
+      error: 'Failed to delete knockout matches',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
 }
