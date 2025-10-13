@@ -17,7 +17,7 @@ model Tournament {
   id          String   @id @default(cuid())
   name        String
   description String?
-  phase       Int      @default(1) // 1-6 for the different phases
+  phase       Int      @default(1) // 1: Registration, 2: Tasks, 3: Pool Matches, 4: Knockout Stage
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -69,12 +69,14 @@ model Match {
   homePlayerId String
   awayPlayerId String
   round        Int      // 1-6 for pool rounds
-  matchType    String   @default("pool") // "pool" or "final"
-  pool         String?  // "A" or "B" for pool matches, null for finals
+  matchType    String   @default("pool") // "pool", "round_of_16", "quarter_final", "semi_final", "group_final", "mega_final"
+  pool         String?  // "A" or "B" for pool/knockout matches, null for mega final
+  knockoutStage String?  // "round_of_16", "quarter_final", "semi_final", "group_final", "mega_final"
   homeScore    Int?
   awayScore    Int?
   status       String   @default("pending") // pending, completed
   winnerId     String?  // ID of the winning player
+  absentStatus String?  // null, "home_absent", "away_absent", "both_absent"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -27,6 +27,7 @@ interface Match {
   awayScore: number | null
   status: string
   winnerId: string | null
+  absentStatus: string | null
   homePlayer: Player
   awayPlayer: Player
 }
@@ -121,7 +122,8 @@ export default function PublicFixturesPage() {
   }, [])
 
   const applyFilters = () => {
-    let filtered = [...matches]
+    // Only apply filters to pool matches
+    let filtered = [...poolMatches]
 
     if (selectedPool !== 'all') {
       filtered = filtered.filter(m => m.pool === selectedPool)
@@ -144,6 +146,16 @@ export default function PublicFixturesPage() {
 
   const uniqueRounds = useMemo(() => 
     [...new Set(matches.map(m => m.round))].sort((a, b) => a - b),
+    [matches]
+  )
+  
+  const knockoutMatches = useMemo(() => 
+    matches.filter(m => m.matchType !== 'pool'),
+    [matches]
+  )
+  
+  const poolMatches = useMemo(() => 
+    matches.filter(m => m.matchType === 'pool'),
     [matches]
   )
   
@@ -298,6 +310,24 @@ export default function PublicFixturesPage() {
                 <p className="text-xs sm:text-sm text-slate-400">Pending</p>
               </div>
             </div>
+            
+            {/* Knockout Stage Link */}
+            {knockoutMatches.length > 0 && (
+              <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-purple-400 mb-1">Knockout Stage Active</p>
+                    <p className="text-sm text-slate-400">{knockoutMatches.length} knockout matches</p>
+                  </div>
+                  <Link
+                    href="/brackets"
+                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold rounded-lg transition-all text-sm"
+                  >
+                    View Brackets
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center mb-4 sm:mb-6">
@@ -309,8 +339,8 @@ export default function PublicFixturesPage() {
           </div>
         )}
 
-        {/* Filters */}
-        {activeTournament && matches.length > 0 && (
+        {/* Filters - Only for Pool Matches */}
+        {activeTournament && poolMatches.length > 0 && (
           <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
             {/* Round Tabs */}
             <div className="mb-4">
@@ -440,6 +470,15 @@ export default function PublicFixturesPage() {
                       {match.winnerId && (
                         <p className="text-xs sm:text-sm text-emerald-400">
                           Winner: {match.winnerId === match.homePlayer.id ? match.homePlayer.name : match.awayPlayer.name}
+                          {match.absentStatus && match.absentStatus !== 'both_absent' ? (
+                            <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 text-xs font-bold">WO</span>
+                          ) : null}
+                        </p>
+                      )}
+                      {match.status === 'completed' && match.absentStatus === 'both_absent' && (
+                        <p className="text-xs sm:text-sm text-slate-400">
+                          <span className="px-2 py-0.5 bg-slate-500/20 border border-slate-500/30 rounded text-slate-300 text-xs font-bold">NULL</span>
+                          <span className="ml-2">Both players absent</span>
                         </p>
                       )}
                     </div>

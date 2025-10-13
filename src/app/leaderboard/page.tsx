@@ -359,11 +359,15 @@ export default function PublicLeaderboardPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/30">
-                        {filteredLeaderboard.map((entry, index) => (
+                        {filteredLeaderboard.map((entry, index) => {
+                          const isQualified = index < 16
+                          return (
                           <tr 
                             key={entry.playerId}
                             className={`transition-all hover:bg-black/60 ${
-                              index < 3 ? 'bg-yellow-500/5' : 'bg-black/20'
+                              isQualified 
+                                ? 'bg-emerald-500/10 border-l-4 border-emerald-500/50' 
+                                : index < 3 ? 'bg-yellow-500/5' : 'bg-black/20'
                             }`}
                           >
                             <td className="px-2 sm:px-4 py-3 whitespace-nowrap">
@@ -415,7 +419,8 @@ export default function PublicLeaderboardPage() {
                               </span>
                             </td>
                           </tr>
-                        ))}
+                        )})
+                        }
                       </tbody>
                     </table>
                   </div>

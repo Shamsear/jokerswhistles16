@@ -670,6 +670,25 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Knockout Stage Management - Phase 4 */}
+            {activeTournament && activeTournament.phase >= 3 && (
+              <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-2xl p-6 hover:border-purple-500/50 transition-all">
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-yellow-400 bg-clip-text text-transparent mb-4">
+                  Knockout Stage
+                </h3>
+                <p className="text-slate-400 mb-6">
+                  Manage knockout stages including Round of 16, Quarter Finals, Semi Finals, Group Finals, and the Mega Final.
+                </p>
+                <Link
+                  href="/admin/knockout"
+                  className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-purple-500/50"
+                >
+                  <Trophy className="h-5 w-5" />
+                  <span>MANAGE KNOCKOUT</span>
+                </Link>
+              </div>
+            )}
+
 
             {/* Task Management - Phase 2 */}
             {activeTournament && activeTournament.phase === 2 && (

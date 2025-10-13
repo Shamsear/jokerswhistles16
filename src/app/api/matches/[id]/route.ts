@@ -64,7 +64,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { homePlayerId, awayPlayerId, homeScore, awayScore, status } = body
+    const { homePlayerId, awayPlayerId, homeScore, awayScore, status, absentStatus } = body
 
     // Prepare update data directly without fetching first
     const updateData: any = {}
@@ -73,6 +73,11 @@ export async function PATCH(
     if (homePlayerId && awayPlayerId) {
       updateData.homePlayerId = homePlayerId
       updateData.awayPlayerId = awayPlayerId
+    }
+
+    // Handle absentStatus updates
+    if (absentStatus !== undefined) {
+      updateData.absentStatus = absentStatus
     }
 
     // Handle score updates - calculate winner on the fly
@@ -85,17 +90,14 @@ export async function PATCH(
         const home = homeScore === null ? null : parseInt(homeScore)
         const away = awayScore === null ? null : parseInt(awayScore)
         
-        if (home !== null && away !== null) {
-          // Use raw SQL for winner calculation to avoid extra query
-          if (home > away) {
-            updateData.winnerId = { _isNull: false } // Will be calculated in DB
-          } else if (away > home) {
-            updateData.winnerId = { _isNull: false }
-          } else {
-            updateData.winnerId = null // Draw
-          }
-          
-          // Mark as completed
+        // NULL match (both absent)
+        if (home === null && away === null) {
+          updateData.winnerId = null
+          updateData.status = 'completed'
+        }
+        // Normal match or WO
+        else if (home !== null && away !== null) {
+          // Winner will be calculated below
           if (!status) {
             updateData.status = 'completed'
           }
@@ -144,6 +146,7 @@ export async function PATCH(
         awayScore: true,
         status: true,
         winnerId: true,
+        absentStatus: true,
         round: true,
         pool: true,
         homePlayer: {

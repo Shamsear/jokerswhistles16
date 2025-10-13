@@ -46,6 +46,7 @@ interface Match {
   awayScore: number | null
   status: string
   winnerId: string | null
+  absentStatus: string | null
   homePlayer: Player
   awayPlayer: Player
 }
@@ -64,6 +65,7 @@ export default function FixturesManagement() {
   const [selectedPool, setSelectedPool] = useState<string>('all')
   const [selectedRound, setSelectedRound] = useState<string>('1') // Default to round 1
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedAbsentStatus, setSelectedAbsentStatus] = useState<string>('all')
   const [homeTeamSearch, setHomeTeamSearch] = useState<string>('')
   const [awayTeamSearch, setAwayTeamSearch] = useState<string>('')
   const [debouncedHomeSearch, setDebouncedHomeSearch] = useState<string>('')
@@ -143,7 +145,7 @@ export default function FixturesManagement() {
 
   useEffect(() => {
     applyFilters()
-  }, [matches, selectedPool, selectedRound, selectedStatus, debouncedHomeSearch, debouncedAwaySearch])
+  }, [matches, selectedPool, selectedRound, selectedStatus, selectedAbsentStatus, debouncedHomeSearch, debouncedAwaySearch])
 
   // Optimized parallel fetch with activeOnly parameter
   const fetchAllData = async () => {
@@ -217,6 +219,17 @@ export default function FixturesManagement() {
       filtered = filtered.filter(m => m.status === selectedStatus)
     }
 
+    // Filter by absent status (WO/NULL)
+    if (selectedAbsentStatus !== 'all') {
+      if (selectedAbsentStatus === 'wo') {
+        filtered = filtered.filter(m => m.absentStatus && m.absentStatus !== 'both_absent')
+      } else if (selectedAbsentStatus === 'null') {
+        filtered = filtered.filter(m => m.absentStatus === 'both_absent')
+      } else if (selectedAbsentStatus === 'normal') {
+        filtered = filtered.filter(m => !m.absentStatus || m.absentStatus === null)
+      }
+    }
+
     // Apply debounced home team search
     if (debouncedHomeSearch.trim()) {
       filtered = filtered.filter(m => 
@@ -254,6 +267,82 @@ export default function FixturesManagement() {
     setEditAwayScore('')
   }, [])
 
+  const saveMatchResultWithAbsent = async (matchId: string, homeScoreValue: number | null, awayScoreValue: number | null, absentStatus: string) => {
+    setSavingMatchId(matchId)
+    setIsSavingToServer(true)
+    
+    // OPTIMISTIC UPDATE: Update UI immediately
+    const optimisticMatches = matches.map(match => {
+      if (match.id === matchId) {
+        let status = 'completed'
+        let winnerId = null
+        
+        if (absentStatus === 'both_absent') {
+          winnerId = null
+        } else if (homeScoreValue !== null && awayScoreValue !== null) {
+          winnerId = homeScoreValue > awayScoreValue ? match.homePlayer.id : 
+                    awayScoreValue > homeScoreValue ? match.awayPlayer.id : null
+        }
+        
+        return {
+          ...match,
+          homeScore: homeScoreValue,
+          awayScore: awayScoreValue,
+          status,
+          winnerId,
+          absentStatus
+        }
+      }
+      return match
+    })
+    
+    setMatches(optimisticMatches)
+    setSuccess('Match result saved!')
+    setEditingMatchId(null)
+    setEditHomeScore('')
+    setEditAwayScore('')
+    
+    setRecentlyUpdatedMatches(prev => new Set(prev).add(matchId))
+    setTimeout(() => {
+      setRecentlyUpdatedMatches(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(matchId)
+        return newSet
+      })
+    }, 2000)
+    
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ homeScore: homeScoreValue, awayScore: awayScoreValue, absentStatus })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        setIsSavingToServer(false)
+        setTimeout(() => setSuccess(''), 2000)
+      } else {
+        setError(data.error || 'Failed to save match result')
+        if (activeTournament) {
+          fetchMatches(activeTournament.id)
+        }
+        setIsSavingToServer(false)
+        setTimeout(() => setError(''), 5000)
+      }
+    } catch (err) {
+      setError('Failed to save match result')
+      if (activeTournament) {
+        fetchMatches(activeTournament.id)
+      }
+      setIsSavingToServer(false)
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setSavingMatchId(null)
+    }
+  }
+
   const saveMatchResult = async (matchId: string) => {
     setSavingMatchId(matchId)
     setIsSavingToServer(true) // Prevent page refresh during save
@@ -270,7 +359,13 @@ export default function FixturesManagement() {
         let winnerId = match.winnerId
         
         // Calculate status and winner
-        if (homeScore !== null && awayScore !== null) {
+        // NULL match: both absent (both scores null)
+        if (homeScore === null && awayScore === null) {
+          status = 'completed'
+          winnerId = null
+        }
+        // Normal match (not WO - absentStatus will be null)
+        else if (homeScore !== null && awayScore !== null) {
           status = 'completed'
           winnerId = homeScore > awayScore ? match.homePlayer.id : 
                     awayScore > homeScore ? match.awayPlayer.id : null
@@ -284,7 +379,8 @@ export default function FixturesManagement() {
           homeScore,
           awayScore,
           status,
-          winnerId
+          winnerId,
+          absentStatus: null // Normal match, no absent players
         }
       }
       return match
@@ -442,7 +538,10 @@ export default function FixturesManagement() {
     const total = matches.length
     const completed = matches.filter(m => m.status === 'completed').length
     const pending = matches.filter(m => m.status === 'pending').length
-    return { total, completed, pending }
+    const wo = matches.filter(m => m.absentStatus && m.absentStatus !== 'both_absent').length
+    const nullMatches = matches.filter(m => m.absentStatus === 'both_absent').length
+    const normal = matches.filter(m => !m.absentStatus || m.absentStatus === null).length
+    return { total, completed, pending, wo, null: nullMatches, normal }
   }, [matches])
 
   if (!isAuthenticated) {
@@ -776,6 +875,20 @@ export default function FixturesManagement() {
                   </div>
 
                   <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-2">Match Type</label>
+                    <select
+                      value={selectedAbsentStatus}
+                      onChange={(e) => setSelectedAbsentStatus(e.target.value)}
+                      className="w-full px-3 md:px-4 py-2 text-sm md:text-base bg-black/20 border-2 border-purple-500/30 rounded-xl text-white focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="normal">Normal Matches</option>
+                      <option value="wo">WO (Walkover)</option>
+                      <option value="null">NULL (Both Absent)</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-2">Home Team</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-slate-500" />
@@ -881,6 +994,40 @@ export default function FixturesManagement() {
                           </div>
                         </div>
 
+                        {/* Quick Action Buttons */}
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={async () => {
+                              await saveMatchResultWithAbsent(match.id, null, null, 'both_absent')
+                            }}
+                            disabled={savingMatchId === match.id}
+                            className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/30 rounded-lg transition-all text-slate-300 font-semibold text-sm disabled:opacity-50"
+                            title="Both players absent - mark as NULL"
+                          >
+                            <span>NULL (Both Absent)</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await saveMatchResultWithAbsent(match.id, 1, 0, 'away_absent')
+                            }}
+                            disabled={savingMatchId === match.id}
+                            className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg transition-all text-emerald-400 font-semibold text-sm disabled:opacity-50"
+                            title="Home player wins by walkover"
+                          >
+                            <span>WO Home</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await saveMatchResultWithAbsent(match.id, 0, 1, 'home_absent')
+                            }}
+                            disabled={savingMatchId === match.id}
+                            className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 font-semibold text-sm disabled:opacity-50"
+                            title="Away player wins by walkover"
+                          >
+                            <span>WO Away</span>
+                          </button>
+                        </div>
+
                         <div className="flex gap-2">
                           <button
                             onClick={() => saveMatchResult(match.id)}
@@ -959,6 +1106,15 @@ export default function FixturesManagement() {
                           {match.winnerId && (
                             <p className="text-xs md:text-sm text-emerald-400 mt-2">
                               Winner: {match.winnerId === match.homePlayer.id ? match.homePlayer.name : match.awayPlayer.name}
+                              {match.absentStatus && match.absentStatus !== 'both_absent' ? (
+                                <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 text-xs font-bold">WO</span>
+                              ) : null}
+                            </p>
+                          )}
+                          {match.status === 'completed' && match.absentStatus === 'both_absent' && (
+                            <p className="text-xs md:text-sm text-slate-400 mt-2">
+                              <span className="px-2 py-0.5 bg-slate-500/20 border border-slate-500/30 rounded text-slate-300 text-xs font-bold">NULL</span>
+                              <span className="ml-2">Both players absent</span>
                             </p>
                           )}
                         </div>

@@ -82,6 +82,14 @@ export default function Home() {
                     <span className="hidden lg:inline">Fixtures</span>
                   </Link>
                   <Link
+                    href="/brackets"
+                    className="group flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 md:px-3 py-1.5 sm:py-2 bg-black/50 hover:bg-orange-500/20 border border-orange-500/30 hover:border-orange-400/50 rounded-lg sm:rounded-xl transition-all text-orange-400 hover:text-orange-300 text-xs sm:text-sm font-semibold flex-1 sm:flex-initial touch-manipulation"
+                    title="View Knockout Brackets"
+                  >
+                    <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden lg:inline">Brackets</span>
+                  </Link>
+                  <Link
                     href="/leaderboard"
                     className="group flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 md:px-3 py-1.5 sm:py-2 bg-black/50 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-400/50 rounded-lg sm:rounded-xl transition-all text-purple-400 hover:text-purple-300 text-xs sm:text-sm font-semibold flex-1 sm:flex-initial touch-manipulation"
                     title="View Leaderboard"

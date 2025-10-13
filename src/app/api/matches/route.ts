@@ -75,6 +75,8 @@ export async function GET(request: NextRequest) {
         awayScore: true,
         status: true,
         winnerId: true,
+        absentStatus: true,
+        knockoutStage: true,
         homePlayerId: true,
         awayPlayerId: true,
         homePlayer: {

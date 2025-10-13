@@ -264,6 +264,35 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
+        {/* Knockout Brackets Section */}
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+          {/* Admin Knockout Management */}
+          <Link
+            href="/admin/knockout"
+            className="group bg-gradient-to-br from-yellow-500/10 to-orange-500/10 backdrop-blur-md border-2 border-yellow-500/30 hover:border-yellow-500/50 active:border-yellow-500/70 rounded-xl sm:rounded-2xl p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <Trophy className="h-14 w-14 text-yellow-400 group-hover:scale-110 transition-transform" />
+              <ArrowRight className="h-6 w-6 text-yellow-400 opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <h3 className="text-2xl font-black text-yellow-400 mb-2">Knockout Stage</h3>
+            <p className="text-slate-300">Manage Round of 16, Quarters, Semis, Finals & Mega Final</p>
+          </Link>
+
+          {/* Public Brackets View */}
+          <Link
+            href="/brackets"
+            className="group bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-md border-2 border-purple-500/30 hover:border-purple-500/50 active:border-purple-500/70 rounded-xl sm:rounded-2xl p-6 transition-all hover:scale-105 active:scale-100 touch-manipulation"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <Trophy className="h-14 w-14 text-purple-400 group-hover:scale-110 transition-transform" />
+              <ArrowRight className="h-6 w-6 text-purple-400 opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <h3 className="text-2xl font-black text-purple-400 mb-2">View Public Brackets</h3>
+            <p className="text-slate-300">See live knockout brackets as participants see them</p>
+          </Link>
+        </div>
+
         {/* Recent Fixtures */}
         {recentMatches.length > 0 && (
           <div className="bg-black/30 backdrop-blur-md border-2 border-emerald-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
