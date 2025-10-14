@@ -15,10 +15,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch all matches for the tournament with player details
+    // Fetch only pool matches for the tournament with player details
+    // Exclude knockout matches from leaderboard calculations
     const matches = await prisma.match.findMany({
       where: {
-        tournamentId: tournamentId
+        tournamentId: tournamentId,
+        matchType: 'pool' // Only include pool matches, exclude all knockout stages
       },
       include: {
         homePlayer: true,

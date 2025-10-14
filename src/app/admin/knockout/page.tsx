@@ -16,7 +16,11 @@ import {
   Trash2,
   Save,
   RotateCcw,
-  Share2
+  Share2,
+  Edit2,
+  X,
+  CheckSquare,
+  ExternalLink
 } from 'lucide-react'
 
 // Lazy load the share modal
@@ -89,6 +93,11 @@ export default function KnockoutManagement() {
   // Share modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [shareStage, setShareStage] = useState<string>('round_of_16')
+  
+  // Edit opponent state
+  const [editingOpponentMatchId, setEditingOpponentMatchId] = useState<string | null>(null)
+  const [editNewOpponentId, setEditNewOpponentId] = useState<string>('')
+  const [allPlayers, setAllPlayers] = useState<Player[]>([])
 
   // Check authentication
   useEffect(() => {
@@ -125,6 +134,7 @@ export default function KnockoutManagement() {
       
       if (response.ok && data.tournaments[0]) {
         setActiveTournament(data.tournaments[0])
+        setAllPlayers(data.tournaments[0].players || [])
         await fetchKnockoutMatches(data.tournaments[0].id)
       }
     } catch (err) {
@@ -245,6 +255,81 @@ export default function KnockoutManagement() {
     setEditingMatchId(null)
     setEditHomeScore('')
     setEditAwayScore('')
+  }
+
+  const startEditOpponent = (matchId: string, currentAwayPlayerId: string) => {
+    setEditingOpponentMatchId(matchId)
+    setEditNewOpponentId(currentAwayPlayerId)
+  }
+
+  const cancelEditOpponent = () => {
+    setEditingOpponentMatchId(null)
+    setEditNewOpponentId('')
+  }
+
+  const saveEditedOpponent = async (match: Match) => {
+    if (!editNewOpponentId || editNewOpponentId === match.awayPlayer.id || !activeTournament) {
+      cancelEditOpponent()
+      return
+    }
+
+    try {
+      const newOpponent = allPlayers.find(p => p.id === editNewOpponentId)
+      if (!newOpponent) {
+        setError('Invalid opponent selected')
+        return
+      }
+
+      // Check if in same pool
+      if (match.pool && newOpponent.pool !== match.pool) {
+        setError('Players must be in the same pool')
+        return
+      }
+
+      // Check for duplicate pairing in this stage
+      const duplicateExists = knockoutMatches.some(m => 
+        m.id !== match.id &&
+        m.knockoutStage === match.knockoutStage &&
+        (
+          (m.homePlayer.id === match.homePlayer.id && m.awayPlayer.id === editNewOpponentId) ||
+          (m.awayPlayer.id === match.homePlayer.id && m.homePlayer.id === editNewOpponentId)
+        )
+      )
+
+      if (duplicateExists) {
+        setError('This matchup already exists in this stage')
+        return
+      }
+
+      setProcessing(true)
+
+      // Update the match via API
+      const response = await fetch(`/api/matches/${match.id}/opponent`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          awayPlayerId: editNewOpponentId
+        })
+      })
+
+      if (response.ok) {
+        setSuccess('Opponent updated successfully!')
+        await fetchKnockoutMatches(activeTournament.id)
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        const data = await response.json()
+        setError(data.error || 'Failed to update opponent')
+        setTimeout(() => setError(''), 5000)
+      }
+
+      cancelEditOpponent()
+    } catch (err) {
+      console.error('Failed to update opponent:', err)
+      setError('Failed to update opponent')
+      setTimeout(() => setError(''), 5000)
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const saveMatchResult = async (matchId: string) => {
@@ -637,12 +722,58 @@ export default function KnockoutManagement() {
             </div>
             
             <div className="flex items-center justify-between">
-              <span className={`font-bold truncate ${
-                match.winnerId === match.awayPlayer.id ? 'text-emerald-400' : 'text-white'
-              }`}>
-                ✈️ {match.awayPlayer.name}
-              </span>
-              <span className="text-2xl font-black text-purple-400">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {editingOpponentMatchId === match.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-xs text-slate-400">✈️</span>
+                    <select
+                      value={editNewOpponentId}
+                      onChange={(e) => setEditNewOpponentId(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-black/50 border border-purple-500/50 rounded text-white text-sm"
+                    >
+                      {allPlayers
+                        .filter(p => p.id !== match.homePlayer.id && p.pool === match.pool)
+                        .map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))
+                      }
+                    </select>
+                    <button
+                      onClick={() => saveEditedOpponent(match)}
+                      className="p-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 rounded text-emerald-400 transition-all"
+                      title="Save opponent change"
+                      disabled={processing}
+                    >
+                      <Save className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={cancelEditOpponent}
+                      className="p-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-red-400 transition-all"
+                      title="Cancel"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className={`font-bold truncate ${
+                      match.winnerId === match.awayPlayer.id ? 'text-emerald-400' : 'text-white'
+                    }`}>
+                      ✈️ {match.awayPlayer.name}
+                    </span>
+                    {match.status === 'pending' && (
+                      <button
+                        onClick={() => startEditOpponent(match.id, match.awayPlayer.id)}
+                        className="p-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded text-blue-400 transition-all shrink-0"
+                        title="Change opponent"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <span className="text-2xl font-black text-purple-400 shrink-0">
                 {match.awayScore !== null ? match.awayScore : '-'}
               </span>
             </div>
@@ -738,6 +869,14 @@ export default function KnockoutManagement() {
             
             {stageExists && (
               <>
+                <Link
+                  href="/admin/match-tasks"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 border border-blue-500/50 rounded-xl transition-all text-white font-bold shadow-lg shadow-blue-500/30"
+                  title="Manage task links for matches"
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  <span>Task Links</span>
+                </Link>
                 <button
                   onClick={() => {
                     setShareStage(stage.key)

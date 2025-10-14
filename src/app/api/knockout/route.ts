@@ -213,7 +213,7 @@ async function generateRoundOf16(tournament: any) {
   // Seeding: 1st vs 16th, 2nd vs 15th, 3rd vs 14th, etc.
   for (let i = 0; i < 8; i++) {
     const topSeed = i // 0-indexed: 0 = 1st place, 1 = 2nd place, etc.
-    const bottomSeed = 15 - i // 15 = 16th place, 14 = 15th place, etc.
+    const bottomSeed = 16 - 1 - i // 15 = 16th place (at index 15), 14 = 15th place (at index 14), etc.
     
     const match = await prisma.match.create({
       data: {
@@ -238,7 +238,7 @@ async function generateRoundOf16(tournament: any) {
   // Seeding: 1st vs 16th, 2nd vs 15th, 3rd vs 14th, etc.
   for (let i = 0; i < 8; i++) {
     const topSeed = i // 0-indexed: 0 = 1st place, 1 = 2nd place, etc.
-    const bottomSeed = 15 - i // 15 = 16th place, 14 = 15th place, etc.
+    const bottomSeed = 16 - 1 - i // 15 = 16th place (at index 15), 14 = 15th place (at index 14), etc.
     
     const match = await prisma.match.create({
       data: {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Users, Loader2, Check, AlertCircle, Trophy, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Users, Loader2, Check, AlertCircle, Trophy, RefreshCw, Edit2, X, Save } from 'lucide-react'
 import SpinWheel from '@/components/SpinWheel'
 
 interface Player {
@@ -44,6 +44,8 @@ export default function OpponentDrawPage() {
   const [isResetting, setIsResetting] = useState(false)
   const [isForceBalancing, setIsForceBalancing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false) // Default OFF for opponent draw since it's interactive
+  const [editingMatch, setEditingMatch] = useState<{ player1Id: string; player2Id: string; round: number } | null>(null)
+  const [editOpponentId, setEditOpponentId] = useState<string>('')
 
   const MATCHES_PER_PLAYER = 6
 
@@ -1452,6 +1454,114 @@ export default function OpponentDrawPage() {
     }
   }
 
+  const startEditMatch = (player1Id: string, player2Id: string, round: number) => {
+    setEditingMatch({ player1Id, player2Id, round })
+    setEditOpponentId(player2Id)
+  }
+
+  const cancelEditMatch = () => {
+    setEditingMatch(null)
+    setEditOpponentId('')
+  }
+
+  const saveEditedMatch = async () => {
+    if (!editingMatch || !editOpponentId || editOpponentId === editingMatch.player2Id) {
+      cancelEditMatch()
+      return
+    }
+
+    try {
+      // Find the match to edit
+      const matchIndex = matches.findIndex(m => 
+        m.player1Id === editingMatch.player1Id && 
+        m.player2Id === editingMatch.player2Id &&
+        m.round === editingMatch.round
+      )
+
+      if (matchIndex === -1) {
+        setError('Match not found')
+        return
+      }
+
+      const oldMatch = matches[matchIndex]
+      const newOpponent = players.find(p => p.id === editOpponentId)
+
+      if (!newOpponent) {
+        setError('Invalid opponent selected')
+        return
+      }
+
+      // Check if this new pairing already exists
+      const duplicateExists = matches.some((m, idx) => idx !== matchIndex && (
+        (m.player1Id === editingMatch.player1Id && m.player2Id === editOpponentId) ||
+        (m.player1Id === editOpponentId && m.player2Id === editingMatch.player1Id)
+      ))
+
+      if (duplicateExists) {
+        setError('This player pair already has a match scheduled')
+        return
+      }
+
+      // Check if in same pool
+      const player1Pool = players.find(p => p.id === editingMatch.player1Id)?.pool
+      const player2Pool = newOpponent.pool
+
+      if (player1Pool !== player2Pool) {
+        setError('Players must be in the same pool')
+        return
+      }
+
+      // Update match locally
+      const updatedMatches = [...matches]
+      updatedMatches[matchIndex] = {
+        ...oldMatch,
+        player2Id: editOpponentId,
+        player2Name: newOpponent.name
+      }
+      setMatches(updatedMatches)
+
+      // Delete old match and create new one in database
+      try {
+        // Delete all matches for this tournament and recreate
+        await fetch(`/api/matches?tournamentId=${tournament.id}`, { method: 'DELETE' })
+
+        // Save all matches
+        const bulkMatches = updatedMatches.map(match => {
+          const player = players.find(p => p.id === match.player1Id)
+          return {
+            homePlayerId: match.player1Id,
+            awayPlayerId: match.player2Id,
+            round: match.round,
+            pool: player?.pool || null
+          }
+        })
+
+        const response = await fetch('/api/matches/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tournamentId: tournament.id,
+            matches: bulkMatches
+          })
+        })
+
+        if (response.ok) {
+          console.log('Match updated successfully')
+        } else {
+          setError('Failed to save updated match')
+        }
+      } catch (err) {
+        console.error('Failed to update match:', err)
+        setError('Failed to update match in database')
+      }
+
+      cancelEditMatch()
+    } catch (err) {
+      console.error('Failed to edit match:', err)
+      setError('Failed to edit match')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -1690,6 +1800,10 @@ export default function OpponentDrawPage() {
                   <p className="text-sm text-slate-400 mt-1">
                     Each player has 6 matches against different opponents
                   </p>
+                  <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" />
+                    Click the edit icon to change any opponent
+                  </p>
                 </div>
                 
                 {/* Summary Stats */}
@@ -1806,34 +1920,103 @@ export default function OpponentDrawPage() {
                               <th className="text-left py-1 text-xs font-semibold text-slate-400">Round</th>
                               <th className="text-left py-1 text-xs font-semibold text-slate-400">Opponent</th>
                               <th className="text-center py-1 text-xs font-semibold text-slate-400">H/A</th>
+                              <th className="text-center py-1 text-xs font-semibold text-slate-400">Edit</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {matchesByRound.map((matchData, roundIdx) => (
-                              <tr key={roundIdx} className="border-b border-slate-700/30">
-                                <td className="py-2 text-slate-400 font-medium">{roundIdx + 1}</td>
-                                <td className="py-2">
-                                  {matchData ? (
-                                    <span className="text-emerald-400 font-medium">{matchData.opponent}</span>
-                                  ) : (
-                                    <span className="text-slate-600 italic">Not assigned</span>
-                                  )}
-                                </td>
-                                <td className="py-2 text-center">
-                                  {matchData ? (
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                      matchData.isHome 
-                                        ? 'bg-blue-500/20 text-blue-400' 
-                                        : 'bg-amber-500/20 text-amber-400'
-                                    }`}>
-                                      {matchData.isHome ? 'H' : 'A'}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-600">-</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
+                            {matchesByRound.map((matchData, roundIdx) => {
+                              // Find the actual match object for this round
+                              const actualMatch = playerMatches.find(m => {
+                                if (m.player1Id === player.id) {
+                                  return m.round - 1 === roundIdx
+                                } else {
+                                  const thisMatchIndex = matches.findIndex(match => 
+                                    (match.player1Id === m.player1Id && match.player2Id === m.player2Id) ||
+                                    (match.player1Id === m.player2Id && match.player2Id === m.player1Id)
+                                  )
+                                  const priorMatchCount = matches.slice(0, thisMatchIndex).filter(match =>
+                                    match.player1Id === player.id || match.player2Id === player.id
+                                  ).length
+                                  return priorMatchCount === roundIdx
+                                }
+                              })
+
+                              const isEditing = editingMatch && actualMatch && 
+                                editingMatch.player1Id === actualMatch.player1Id && 
+                                editingMatch.player2Id === actualMatch.player2Id &&
+                                editingMatch.round === actualMatch.round
+
+                              return (
+                                <tr key={roundIdx} className="border-b border-slate-700/30">
+                                  <td className="py-2 text-slate-400 font-medium">{roundIdx + 1}</td>
+                                  <td className="py-2">
+                                    {isEditing ? (
+                                      <select
+                                        value={editOpponentId}
+                                        onChange={(e) => setEditOpponentId(e.target.value)}
+                                        className="w-full px-2 py-1 bg-black/50 border border-emerald-500/50 rounded text-white text-sm"
+                                      >
+                                        {players
+                                          .filter(p => p.id !== player.id && p.pool === player.pool)
+                                          .map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                          ))
+                                        }
+                                      </select>
+                                    ) : matchData ? (
+                                      <span className="text-emerald-400 font-medium">{matchData.opponent}</span>
+                                    ) : (
+                                      <span className="text-slate-600 italic">Not assigned</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 text-center">
+                                    {matchData ? (
+                                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                        matchData.isHome 
+                                          ? 'bg-blue-500/20 text-blue-400' 
+                                          : 'bg-amber-500/20 text-amber-400'
+                                      }`}>
+                                        {matchData.isHome ? 'H' : 'A'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-600">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 text-center">
+                                    {matchData && actualMatch ? (
+                                      isEditing ? (
+                                        <div className="flex justify-center gap-1">
+                                          <button
+                                            onClick={saveEditedMatch}
+                                            className="p-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 rounded text-emerald-400 transition-all"
+                                            title="Save changes"
+                                          >
+                                            <Save className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={cancelEditMatch}
+                                            className="p-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded text-red-400 transition-all"
+                                            title="Cancel"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => startEditMatch(actualMatch.player1Id, actualMatch.player2Id, actualMatch.round)}
+                                          className="p-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 rounded text-blue-400 transition-all"
+                                          title="Edit opponent"
+                                        >
+                                          <Edit2 className="h-3 w-3" />
+                                        </button>
+                                      )
+                                    ) : (
+                                      <span className="text-slate-600">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>

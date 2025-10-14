@@ -533,20 +533,43 @@ export default function MatchTasksAdmin() {
             
             {/* Round Tabs */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {allRounds.map((round) => (
-                <button
-                  key={round}
-                  onClick={() => setSelectedRound(round)}
-                  className={`px-4 sm:px-6 py-2 rounded-lg font-semibold text-sm sm:text-base transition-all touch-manipulation ${
-                    selectedRound === round
-                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-lg shadow-yellow-500/50'
-                      : 'bg-black/40 border-2 border-yellow-500/30 text-yellow-400 hover:border-yellow-500/50 hover:bg-yellow-500/10'
-                  }`}
-                >
-                  Round {round}
-                </button>
-              ))}
+              {allRounds.map((round) => {
+                // Determine round type
+                let roundLabel = `Round ${round}`
+                if (round === 7) roundLabel = `Round ${round} (R16)`
+                if (round === 8) roundLabel = `Round ${round} (QF)`
+                if (round === 9) roundLabel = `Round ${round} (SF)`
+                if (round === 10) roundLabel = `Round ${round} (GF)`
+                if (round === 11) roundLabel = `Round ${round} (MF)`
+                
+                return (
+                  <button
+                    key={round}
+                    onClick={() => setSelectedRound(round)}
+                    className={`px-4 sm:px-6 py-2 rounded-lg font-semibold text-sm sm:text-base transition-all touch-manipulation ${
+                      selectedRound === round
+                        ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-black shadow-lg shadow-yellow-500/50'
+                        : 'bg-black/40 border-2 border-yellow-500/30 text-yellow-400 hover:border-yellow-500/50 hover:bg-yellow-500/10'
+                    }`}
+                  >
+                    {roundLabel}
+                  </button>
+                )
+              })}
             </div>
+            
+            {/* Info about knockout rounds */}
+            {selectedRound && selectedRound >= 7 && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                <p className="text-purple-300 text-xs">
+                  <strong>🏆 Knockout Stage:</strong> {selectedRound === 7 && 'Round of 16 (R16)'}
+                  {selectedRound === 8 && 'Quarter Finals (QF)'}
+                  {selectedRound === 9 && 'Semi Finals (SF)'}
+                  {selectedRound === 10 && 'Group Finals (GF)'}
+                  {selectedRound === 11 && 'Mega Final (MF)'}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
