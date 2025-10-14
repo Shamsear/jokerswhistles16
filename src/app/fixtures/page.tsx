@@ -404,11 +404,11 @@ export default function PublicFixturesPage() {
           </div>
         )}
 
-        {/* Matches List */}
-        {activeTournament && (
-          <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        {/* Pool Matches List */}
+        {activeTournament && poolMatches.length > 0 && (
+          <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
             <h3 className="text-base sm:text-lg font-semibold bg-gradient-to-r from-purple-400 to-emerald-400 bg-clip-text text-transparent mb-4">
-              Matches ({filteredMatches.length})
+              Pool Matches ({filteredMatches.length})
             </h3>
             
             {filteredMatches.length > 0 ? (
@@ -495,6 +495,107 @@ export default function PublicFixturesPage() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Knockout Matches List */}
+        {activeTournament && knockoutMatches.length > 0 && (
+          <div className="bg-black/30 backdrop-blur-md border-2 border-purple-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base sm:text-lg font-semibold bg-gradient-to-r from-purple-400 to-yellow-400 bg-clip-text text-transparent">
+                🏆 Knockout Stage ({knockoutMatches.length})
+              </h3>
+              <Link
+                href="/brackets"
+                className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-all text-purple-400 text-xs sm:text-sm font-semibold"
+              >
+                View Brackets
+              </Link>
+            </div>
+            
+            <div className="space-y-3">
+              {knockoutMatches.map((match) => {
+                // Determine stage name
+                let stageName = ''
+                if (match.round === 7) stageName = 'Round of 16'
+                if (match.round === 8) stageName = 'Quarter Final'
+                if (match.round === 9) stageName = 'Semi Final'
+                if (match.round === 10) stageName = 'Group Final'
+                if (match.round === 11) stageName = 'Mega Final'
+                
+                return (
+                  <div
+                    key={match.id}
+                    className={`bg-black/40 border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all ${
+                      match.status === 'completed' 
+                        ? 'border-emerald-500/30 hover:border-emerald-500/50' 
+                        : 'border-purple-500/30 hover:border-purple-500/50'
+                    }`}
+                  >
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded text-xs font-bold text-yellow-400">
+                          {stageName}
+                        </span>
+                        {match.pool && (
+                          <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-xs font-bold text-blue-400">
+                            Pool {match.pool}
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          match.status === 'completed' 
+                            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+                            : 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400'
+                        }`}>
+                          {match.status === 'completed' ? '✓ Completed' : 'Pending'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                        <div className="flex items-center justify-between sm:justify-start space-x-2 flex-1">
+                          <span className={`text-sm sm:text-base lg:text-lg font-bold truncate ${
+                            match.winnerId === match.homePlayer.id ? 'text-emerald-400' : 'text-white'
+                          }`}>
+                            🏠 {match.homePlayer.name}
+                          </span>
+                          <span className="text-xl sm:text-2xl font-black text-emerald-400 shrink-0">
+                            {match.homeScore !== null ? match.homeScore : '-'}
+                          </span>
+                        </div>
+
+                        <span className="text-slate-500 font-bold text-center hidden sm:inline shrink-0">vs</span>
+
+                        <div className="flex items-center justify-between sm:justify-start space-x-2 flex-1">
+                          <span className="text-xl sm:text-2xl font-black text-purple-400 shrink-0">
+                            {match.awayScore !== null ? match.awayScore : '-'}
+                          </span>
+                          <span className={`text-sm sm:text-base lg:text-lg font-bold truncate ${
+                            match.winnerId === match.awayPlayer.id ? 'text-emerald-400' : 'text-white'
+                          }`}>
+                            ✈️ {match.awayPlayer.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      {match.winnerId && (
+                        <p className="text-xs sm:text-sm text-emerald-400">
+                          Winner: {match.winnerId === match.homePlayer.id ? match.homePlayer.name : match.awayPlayer.name}
+                          {match.absentStatus && match.absentStatus !== 'both_absent' ? (
+                            <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 text-xs font-bold">WO</span>
+                          ) : null}
+                        </p>
+                      )}
+                      {match.status === 'completed' && match.absentStatus === 'both_absent' && (
+                        <p className="text-xs sm:text-sm text-slate-400">
+                          <span className="px-2 py-0.5 bg-slate-500/20 border border-slate-500/30 rounded text-slate-300 text-xs font-bold">NULL</span>
+                          <span className="ml-2">Both players absent</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </main>

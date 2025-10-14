@@ -212,11 +212,26 @@ export default function MatchTasksAdmin() {
     }
   }
 
+  const getUniquePools = () => {
+    const pools = new Set<string | null>()
+    matches.forEach(m => pools.add(m.pool))
+    return Array.from(pools).sort((a, b) => {
+      if (a === null) return 1
+      if (b === null) return -1
+      return a.localeCompare(b)
+    })
+  }
+
   const applyFilters = () => {
     let filtered = [...matches]
 
+    // Pool filter - handle 'all', 'no-pool', and specific pools
     if (selectedPool !== 'all') {
-      filtered = filtered.filter(m => m.pool === selectedPool)
+      if (selectedPool === 'no-pool') {
+        filtered = filtered.filter(m => m.pool === null)
+      } else {
+        filtered = filtered.filter(m => m.pool === selectedPool)
+      }
     }
 
     if (homeTeamSearch.trim()) {
@@ -231,8 +246,10 @@ export default function MatchTasksAdmin() {
       )
     }
 
-    // Sort by pool
+    // Sort by pool - put null pools at the end
     filtered.sort((a, b) => {
+      if (a.pool === null && b.pool !== null) return 1
+      if (a.pool !== null && b.pool === null) return -1
       if (a.pool && b.pool) return a.pool.localeCompare(b.pool)
       return 0
     })
@@ -293,11 +310,6 @@ export default function MatchTasksAdmin() {
     } finally {
       setResettingMatchId(null)
     }
-  }
-
-  const getUniquePools = () => {
-    const pools = [...new Set(matches.map(m => m.pool).filter(p => p !== null))]
-    return pools.sort()
   }
 
   const prepareShareMessage = (poolFilter?: string | null) => {
@@ -592,7 +604,7 @@ export default function MatchTasksAdmin() {
                 >
                   <option value="all">All Pools</option>
                   {getUniquePools().map(pool => (
-                    <option key={pool} value={pool || ''}>{pool ? `Pool ${pool}` : 'No Pool'}</option>
+                    <option key={pool || 'no-pool'} value={pool || 'no-pool'}>{pool ? `Pool ${pool}` : 'No Pool (Mega Final)'}</option>
                   ))}
                 </select>
               </div>

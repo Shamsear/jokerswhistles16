@@ -603,14 +603,7 @@ export default function AdminDashboard() {
                 <h2 className="text-2xl font-black bg-gradient-to-r from-emerald-400 via-purple-400 to-yellow-400 bg-clip-text text-transparent mb-2">
                   No Active Tournament
                 </h2>
-                <p className="text-slate-400 mb-6">Create a new tournament to get started</p>
-                <button
-                  onClick={createTournament}
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-black font-bold rounded-xl transition-all shadow-xl shadow-emerald-500/50"
-                >
-                  <Plus className="h-5 w-5" />
-                  <span>CREATE TOURNAMENT</span>
-                </button>
+                <p className="text-slate-400">Please contact the administrator to set up a tournament</p>
               </div>
             )}
 
